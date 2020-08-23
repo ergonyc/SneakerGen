@@ -20,24 +20,28 @@ if REMOTE:  # Running on EC2 instance or similar
     DATA_DIR = "/data/sn/all/data/"
 
 else:  # Running locally
-    # META_DATA_CSV = "/home/starstorms/Insight/shape/data/dfmeta.csv"
-    META_DATA_CSV = "/Users/ergonyc/Projects/Project2.0/SnkrGen/beta-vae/data/xxx.csv"
+    # META_DATA_CSV = "/Users/ergonyc/Projects/DATABASE/SnkrScrpr/data/basic_data.csv"
+    META_DATA_CSV = "/Users/ergonyc/Projects/DATABASE/SnkrScrpr/data/basic_data_raw.csv"
 
     """
     This is the directory file that stores all of the metadata information gathered and analyzed by the program to generate descriptions.
     It is made by the program and shouldn't require additional action but is a useful resource to inspect manually    
     """
 
-    # VOXEL_FILEPATH = "/home/starstorms/Insight/ShapeNet/all"
-    ROOT_FILEPATH = "/Users/ergonyc/Projects/Project2.0/SnkrScrpr/data/"
-    FILEPATH_GOAT = "/Users/ergonyc/Projects/Project2.0/SnkrScrpr/data/goat/img"
-    FILEPATH_SNS = "/Users/ergonyc/Projects/Project2.0/SnkrScrpr/data/sns/img"
-    VOXEL_FILEPATH = ROOT_FILEPATH
+    # ROOT_FILEPATH = "/Users/ergonyc/Projects/Project2.0/SnkrScrpr/data/"
+    # FILEPATH_GOAT = "/Users/ergonyc/Projects/Project2.0/SnkrScrpr/data/goat/img/"
+    # FILEPATH_SNS = "/Users/ergonyc/Projects/Project2.0/SnkrScrpr/data/sns/img/"
+
+    ROOT_FILEPATH = "/Users/ergonyc/Projects/DATABASE/SnkrScrpr/data/"
+    FILEPATH_GOAT = "/Users/ergonyc/Projects/DATABASE/SnkrScrpr/data/goat/img/"
+    FILEPATH_SNS = "/Users/ergonyc/Projects/DATABASE/SnkrScrpr/data/sns/img/"
+
+    IMAGE_FILEPATH = ROOT_FILEPATH
     """
     This is the location of the image data scraped from GOAT and SNS. 
     """
 
-    IMG_RUN_DIR = "/Users/ergonyc/Projects/Project2.0/SnkrGen/beta-vae/runs"
+    IMG_RUN_DIR = "/Users/ergonyc/Projects/Project2.0/SnkrGen/beta-vae/runs/"
     TXT_RUN_DIR = "/Users/ergonyc/Projects/Project2.0/SnkrGen/beta-vae/txtruns/"
     """
     These are the run log and model checkpoint folders. This folder structure is generated and managed by the logger.py class.
@@ -72,13 +76,13 @@ else:  # Running locally
         ...
     """
 
-    DATA_DIR = "/Users/ergonyc/Projects/Project2.0/SnkrGen/beta-vae/data"
+    DATA_DIR = "/Users/ergonyc/Projects/Project2.0/SnkrGen/beta-vae/data/"
 
     """
     This folder is used to cache various computation and memory intensive generated files like the randomized descriptions of objects.
     """
 
-    RENDERS_DIR = "/Users/ergonyc/Projects/Project2.0/SnkrGen/beta-vae/renders"
+    RENDERS_DIR = "/Users/ergonyc/Projects/Project2.0/SnkrGen/beta-vae/renders/"
     """
     This folder is used to store rendered images of the models for quick and easy viewing and for use in the streamlit app.
     Primarily used when inspecting the quality of generated descriptions.

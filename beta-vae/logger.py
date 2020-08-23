@@ -50,17 +50,21 @@ class logger:
         self.new_run = root_dir is None
         if self.new_run:
             self.root_dir = cf.IMG_RUN_DIR
-            self.root_dir = self.root_dir + ut.addTimeStamp()
+            self.root_dir = os.path.join(self.root_dir, ut.addTimeStamp())
         else:
             self.root_dir = root_dir
 
         if txtMode:
-            self.root_dir = self.root_dir.replace("runs", "txtruns")
+            if self.root_dir.split("/")[-2] == "txtruns":
+                print(f"root_dir already txtruns= {self.root_dir}")
+            else:
+                self.root_dir = self.root_dir.replace("runs", "txtruns")
+                print(f"changed to text runs:root_dir= {self.root_dir}")
 
-        self.vox_in_dir = cf.VOXEL_FILEPATH
-        self.plot_out_dir = self.root_dir + "/plots"
-        self.model_saves = self.root_dir + "/models"
-        self.tblogs = self.root_dir + "/logs"
+        self.img_in_dir = cf.IMAGE_FILEPATH
+        self.plot_out_dir = os.path.join(self.root_dir, "plots/")
+        self.model_saves = os.path.join(self.root_dir, "models/")
+        self.tblogs = os.path.join(self.root_dir, "logs")
         self.updatePlotDir()
 
     def checkMakeDirs(self):
