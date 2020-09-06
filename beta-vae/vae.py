@@ -222,7 +222,7 @@ for sample_index in range(0,20):
 if (lg.total_epochs > 10) :
     ut.plotVox(model.reconstruct(test_samples[sample_index][None,...], training=False), limits=cf_limits, title='Recon')
 
-sample_index = 17
+sample_index = 7
 ut.plotImg(train_samples[sample_index], title='train', threshold=0.5, limits=cf_limits, save_fig=False)
 ut.plotImg(test_samples[sample_index], title='test', threshold=0.5, limits=cf_limits, save_fig=False)
 
@@ -261,7 +261,7 @@ def trainModel(epochs, display_interval=-1, save_interval=10, test_interval=10) 
             ut.showReconstruct(model, test_samples, title=lg.total_epochs, index=sample_index, show_original=True, save_fig=True, limits=cf_limits)
 
         if epoch % test_interval == 0:
-            #test_loss2 = getTestSetLoss(test_dataset, 2)  # what should I do here??/ batch of 2???  shouldn't it be batch size??
+            test_loss2 = getTestSetLoss(test_dataset, 2)  # what should I do here??/ batch of 2???  shouldn't it be batch size??
             test_loss = getTestSetLoss(test_dataset, cf_batch_size)  # what should I do here??/ batch of 2???  shouldn't it be batch size??
             print('   TEST LOSS  : {:.1f}    for epoch: {}'.format(test_loss, lg.total_epochs))
             #print('   TEST LOSS 2: {:.1f}    for epoch: {}'.format(test_loss2, lg.total_epochs))
