@@ -71,7 +71,7 @@ cf_limits=[cf_img_size, cf_img_size]
 #ut.readMeta()
 dfmeta = ut.readMeta()
 
-#%% Make model and print info
+#%% model viz function
 # can i make this a model function??
 def plotIO(model):
     print("\n Net Summary (input then output):")
@@ -146,12 +146,12 @@ files = glob.glob(os.path.join(img_in_dir, "*/img/*"))
 files = np.asarray(files)
 
 
-# train_data, val_data, all_data = splitShuffleData(files,VAL_FRAC)
+train_data, val_data, all_data = splitShuffleData(files,VAL_FRAC)
 
 # ## Save base train data to file
-# np.save(os.path.join(cf.DATA_DIR, 'train_data.npy'), train_data, allow_pickle=True)
-# np.save(os.path.join(cf.DATA_DIR, 'val_data.npy'), val_data, allow_pickle=True)
-# np.save(os.path.join(cf.DATA_DIR, 'all_data.npy'), all_data, allow_pickle=True)
+np.save(os.path.join(cf.DATA_DIR, 'train_data.npy'), train_data, allow_pickle=True)
+np.save(os.path.join(cf.DATA_DIR, 'val_data.npy'), val_data, allow_pickle=True)
+np.save(os.path.join(cf.DATA_DIR, 'all_data.npy'), all_data, allow_pickle=True)
 
 
 #%% Load base train data from file
@@ -180,7 +180,7 @@ train_dataset = batchAndPrepDataset(train_dataset)
 test_dataset = batchAndPrepDataset(test_dataset)
 
 
-#%% # save data to disk ... (to keep the partitioning) 
+#%% # save etl.data to disk ... (to keep the partitioning) 
 
 # #path = os.path.join(cf.IMG_RUN_DIR, "saved_data","train")
 # # #save training data
@@ -221,6 +221,10 @@ for sample_index in range(0,20):
 
 if (lg.total_epochs > 10) :
     ut.plotVox(model.reconstruct(test_samples[sample_index][None,...], training=False), limits=cf_limits, title='Recon')
+
+sample_index = 17
+ut.plotImg(train_samples[sample_index], title='train', threshold=0.5, limits=cf_limits, save_fig=False)
+ut.plotImg(test_samples[sample_index], title='test', threshold=0.5, limits=cf_limits, save_fig=False)
 
 #%% Training methods
 def getTestSetLoss(dataset, batches=0) :
@@ -333,7 +337,7 @@ testimgs = np.concatenate(imgs,axis=0)
 print('Epoch Time: {:.2f}'.format( float(time.time() - start_time)))
 
 ut.dumpPickle(os.path.join(cf.IMG_RUN_DIR, "saved_data","test.pkl"), (testimgs,testlabs) )
-#%% Train model
+#%% log Config...
 lg.writeConfig(locals(), [cv.CVAE, cv.CVAE.__init__])
 lg.updatePlotDir()
 
@@ -365,12 +369,7 @@ for sample_index in range(32):
 #%% 
 
 for test_samples, test_labels in test_dataset.take(1) : pass
-#for train_samples, train_labels in train_dataset.take(1) : pass
-
-sample_index = 1
-
-for sample_index in range(10):
-    ut.showReconstruct(model, test_samples, title=lg.total_epochs, index=sample_index, show_original=True, save_fig=False, limits=cf_limits)
+#for train_samples, train_labels in train_dataset.take(1) : pass new environmentx=sample_index, show_original=True, save_fig=False, limits=cf_limits)
 
 
 ###########################

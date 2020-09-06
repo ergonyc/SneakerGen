@@ -29,13 +29,15 @@ The models folder contains all of the saved models from training.
 The plots folder contains any output plots during training such as shape reconstructions.    
 """
 
+#HACK... remove easy_tf2_log... its not working....
+
 #%% Imports
 import os
 import inspect
 import csv
 
 import utils as ut
-import easy_tf2_log as etl
+#import easy_tf2_log as etl
 import tensorflow as tf
 import configs as cf
 
@@ -80,14 +82,14 @@ class logger:
             os.mkdir(self.model_saves)
             os.mkdir(self.tblogs)
             os.mkdir(self.saved_data)
-            etl.set_dir(self.tblogs)
+            #etl.set_dir(self.tblogs)
 
     def reset(self, total_epochs=1):
         self.total_epochs = total_epochs
 
     def logMetric(self, metric, name):
         self.checkMakeDirs()
-        etl.tflog(name, metric, step=self.total_epochs)
+        #etl.tflog(name, metric, step=self.total_epochs)
 
     def incrementEpoch(self):
         self.total_epochs = self.total_epochs + 1
@@ -111,12 +113,12 @@ class logger:
         if path == None:
             status = self.checkpoint.restore(self.cpmanager.latest_checkpoint)
             print("Latest model chkp path is : {} etl.set_dir...".format(self.cpmanager.latest_checkpoint))
-            etl.set_dir(self.tblogs)
+            #etl.set_dir(self.tblogs)
             return status
         else:
             status = self.checkpoint.restore(path)
             print("Latest model chkp path is : {}  etl.set_dir".format(status))
-            etl.set_dir(self.tblogs)
+            #etl.set_dir(self.tblogs)
             return status
 
     def writeConfig(self, variables, code):

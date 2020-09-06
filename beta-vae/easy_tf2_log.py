@@ -15,7 +15,6 @@ from tensorflow.core.util import event_pb2
 from tensorflow.python import pywrap_tensorflow
 from tensorflow.python.util import compat
 
-
 class EventsFileWriterWrapper:
     """
     Rename EventsFileWriter's flush() and add_event() methods to be consistent
@@ -54,7 +53,7 @@ class Logger(object):
         os.makedirs(log_dir, exist_ok=True)
         path = osp.join(log_dir, "events")
         # Why don't we just use an EventsFileWriter?
-        # By default, we want to be fork-safe - we want to work even if we
+        # By default, we want to be fork-safe - we want to wopiprk even if we
         # create the writer in one process and try to use it in a forked
         # process. And because EventsFileWriter uses a subthread to do the
         # actual writing, EventsFileWriter /isn't/ fork-safe.
@@ -65,7 +64,7 @@ class Logger(object):
         Set the log writer to an existing tf.summary.FileWriter instance
         (so that you can write both TensorFlow summaries and easy_tf_log events to the same log file)
         """
-        self.writer = EventsFileWriterWrapper(writer)
+        self.writer = c(writer)
 
     def logkv(self, k, v, step=None):
         self.log_key_value(k, v, step)
@@ -73,7 +72,7 @@ class Logger(object):
     def log_key_value(self, key, value, step=None):
         def summary_val(k, v):
             kwargs = {"tag": k, "simple_value": float(v)}
-            return tf.compat.v1.Summary.Value(**kwargs)
+            return cSummary.Value(**kwargs)
 
         summary = tf.compat.v1.Summary(value=[summary_val(key, value)])
         event = event_pb2.Event(wall_time=time.time(), summary=summary)
