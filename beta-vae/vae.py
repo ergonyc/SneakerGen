@@ -47,8 +47,8 @@ import tensorflow as tf
 AUTOTUNE = tf.data.experimental.AUTOTUNE
 VAL_FRAC = 20.0 / 100.0
 
-%reload_ext autoreload
-%autoreload 2
+# %reload_ext autoreload
+# %autoreload 2
 
 #%% Setup
 
@@ -71,6 +71,9 @@ cf_limits=[cf_img_size, cf_img_size]
 #ut.readMeta()
 dfmeta = ut.readMeta()
 
+tf.config.experimental.list_physical_devices('GPU') 
+
+
 #%% model viz function
 # can i make this a model function??
 def plotIO(model):
@@ -92,14 +95,14 @@ plotIO(model.gen_model)
 #%% Setup logger info
 train_from_scratch = True
 if train_from_scratch :
-    lg = logger.logger(trainMode=cf.REMOTE, txtMode=False)
     lg = logger.logger(trainMode=True, txtMode=False)
 else :
-    shp_run_id = '0821-2318'  
+    shp_run_id = '0907-2325'  
     root_dir = os.path.join(cf.IMG_RUN_DIR, shp_run_id)
-    lg = logger.logger(root_dir=root_dir, txtMode=False)
+    lg = logger.logger(root_dir=root_dir, trainMode=True, txtMode=False)
 
 lg.setupCP(encoder=model.enc_model, generator=model.gen_model, opt=model.optimizer)
+lg.checkMakeDirs()
 lg.restoreCP() # actuall reads in the  weights...
 
 
@@ -139,23 +142,23 @@ def splitShuffleData(files, test_split):
 
 
 #%% Set up the data..
+# TODO:  logical on does train_data exist... if not make it.. else just load
+
 img_in_dir = lg.img_in_dir
 #img_in_dir = "/Users/ergonyc/Projects/DATABASE/SnkrScrpr/data/"
 files = glob.glob(os.path.join(img_in_dir, "*/img/*"))
 #shuffle the dataset (GOAT+SNS)
 files = np.asarray(files)
 
-
 train_data, val_data, all_data = splitShuffleData(files,VAL_FRAC)
 
-# ## Save base train data to file
+# # ## Save base train data to file  
 np.save(os.path.join(cf.DATA_DIR, 'train_data.npy'), train_data, allow_pickle=True)
 np.save(os.path.join(cf.DATA_DIR, 'val_data.npy'), val_data, allow_pickle=True)
 np.save(os.path.join(cf.DATA_DIR, 'all_data.npy'), all_data, allow_pickle=True)
 
 
-#%% Load base train data from file
-## Save base train data to file
+#%% Load base train data from finterval=5,curr_losses=curr_losses)
 train_dat = np.load(os.path.join(cf.DATA_DIR, 'train_data.npy'))
 val_dat = np.load(os.path.join(cf.DATA_DIR, 'val_data.npy'))
 all_dat = np.load(os.path.join(cf.DATA_DIR, 'all_data.npy'))
@@ -179,25 +182,6 @@ def batchAndPrepDataset(dataset):
 train_dataset = batchAndPrepDataset(train_dataset)
 test_dataset = batchAndPrepDataset(test_dataset)
 
-
-#%% # save etl.data to disk ... (to keep the partitioning) 
-
-# #path = os.path.join(cf.IMG_RUN_DIR, "saved_data","train")
-# # #save training data
-# # tf.data.experimental.save(
-# #     train_dataset, path, compression=None, shard_func=None
-# # )
-# ut.dumpPickle(os.path.join(cf.IMG_RUN_DIR, "saved_data","train.pkl"), train_dataset)
-
-
-# #save testing data
-# #path = os.path.join(cf.IMG_RUN_DIR, "saved_data","test")
-# # tf.data.experimental.save(
-# #     test_dataset, path, compression=None, shard_func=None
-# # )
-# ut.dumpPickle(os.path.join(cf.IMG_RUN_DIR, "saved_data","test.pkl"), test_dataset)
-
-
 #%% Load all data
 # why do we need to do this??? to get a list of samples??
 for train_samples, train_labels in train_dataset.take(1) : pass
@@ -212,19 +196,19 @@ for _ in train_dataset :
     total_train_batchs += 1
 
 
-#%% Setup datasets
+# #%% Setup datasets
 sample_index = 1
-for sample_index in range(0,20):
-    ut.plotImg(train_samples[sample_index], title='train', threshold=0.5, limits=cf_limits, save_fig=False)
-    ut.plotImg(test_samples[sample_index], title='test', threshold=0.5, limits=cf_limits, save_fig=False)
-#%% Show initial models
+# for sample_index in range(0,20):
+#     ut.plotImg(train_samples[sample_index], title='train', threshold=0.5, limits=cf_limits, save_fig=False)
+#     ut.plotImg(test_samples[sample_index], title='test', threshold=0.5, limits=cf_limits, save_fig=False)
+# #%% Show initial models
 
-if (lg.total_epochs > 10) :
-    ut.plotVox(model.reconstruct(test_samples[sample_index][None,...], training=False), limits=cf_limits, title='Recon')
+# if (lg.total_epochs > 10) :
+#     ut.plotVox(model.reconstruct(test_samples[sample_index][None,...], training=False), limits=cf_limits, title='Recon')
 
-sample_index = 7
-ut.plotImg(train_samples[sample_index], title='train', threshold=0.5, limits=cf_limits, save_fig=False)
-ut.plotImg(test_samples[sample_index], title='test', threshold=0.5, limits=cf_limits, save_fig=False)
+# sample_index = 6
+# ut.plotImg(train_samples[sample_index], title='train', threshold=0.5, limits=cf_limits, save_fig=False)
+# ut.plotImg(test_samples[sample_index], title='test', threshold=0.5, limits=cf_limits, save_fig=False)
 
 #%% Training methods
 def getTestSetLoss(dataset, batches=0) :
@@ -236,11 +220,12 @@ def getTestSetLoss(dataset, batches=0) :
     return np.mean(test_losses)
 
 
-def trainModel(epochs, display_interval=-1, save_interval=10, test_interval=10) :
+def trainModel(epochs, display_interval=-1, save_interval=10, test_interval=10,current_losses=([],[])) :
     print('\n\nStarting training...\n')
     model.training=True
-    loss_batch2 = []
-    loss_batchN = []
+    elbo_test,elbo_train = current_losses
+    # elbo_test = []
+    # elbo_train = []
     for epoch in range(1, epochs + 1):
         start_time = time.time()
         losses = []
@@ -258,30 +243,37 @@ def trainModel(epochs, display_interval=-1, save_interval=10, test_interval=10) 
         elbo = np.mean(losses)
 
         if ((display_interval > 0) & (epoch % display_interval == 0)) :
-            ut.showReconstruct(model, test_samples, title=lg.total_epochs, index=sample_index, show_original=True, save_fig=True, limits=cf_limits)
+            if epoch == 1:
+                ut.showReconstruct(model, test_samples, title=lg.total_epochs, index=sample_index, show_original=True, save_fig=True, limits=cf_limits)    
+            else:
+                ut.showReconstruct(model, test_samples, title=lg.total_epochs, index=sample_index, show_original=False, save_fig=True, limits=cf_limits)
 
         if epoch % test_interval == 0:
-            test_loss2 = getTestSetLoss(test_dataset, 2)  # what should I do here??/ batch of 2???  shouldn't it be batch size??
+            #test_loss2 = getTestSetLoss(test_dataset, 2)  # what should I do here??/ batch of 2???  shouldn't it be batch size??
             test_loss = getTestSetLoss(test_dataset, cf_batch_size)  # what should I do here??/ batch of 2???  shouldn't it be batch size??
             print('   TEST LOSS  : {:.1f}    for epoch: {}'.format(test_loss, lg.total_epochs))
-            #print('   TEST LOSS 2: {:.1f}    for epoch: {}'.format(test_loss2, lg.total_epochs))
+            #print('   TEST LOSS 2: {:.1f}    for epoch: {}'.format(test_loscurrent_lossess2, lg.total_epochs))
             lg.logMetric(test_loss, 'test loss')
-            loss_batch2.append(test_loss2)
-            loss_batchN.append(test_loss)
+            #loss_batch2.append(test_loss2)
+            elbo_test.append(test_loss)
 
         if epoch % save_interval == 0:
             lg.cpSave()
 
         print('Epoch: {}   Train loss: {:.1f}   Epoch Time: {:.2f}'.format(lg.total_epochs, float(elbo), float(time.time() - start_time)))
         lg.logMetric(elbo, 'train loss')
+        elbo_train.append(elbo)
+
         lg.incrementEpoch()
+
         if (ut.checkStopSignal(dir_path=cf.IMG_RUN_DIR)) :
             print(f"stoping at epoch = {epoch}")
             break
         else:
             print(f"executed {epoch} epochs")
-
-    return epoch,loss_batchN #(loss_batch2,loss_batchN)
+    
+    out_losses = (elbo_train,elbo_test)
+    return epoch, out_losses #(loss_batch2,loss_batchN)
 
 
 #%% Training data save
@@ -312,7 +304,7 @@ print('Epoch Time: {:.2f}'.format( float(time.time() - start_time)))
 # tf.data.experimental.save(
 #     train_dataset, path, compression=None, shard_func=None
 # )
-ut.dumpPickle(os.path.join(cf.IMG_RUN_DIR, "saved_data","train_agumented.pkl"), (trainimgs,trainlabs) )
+ut.dumpPickle(os.path.join(lg.saved_data,"train_agumented.pkl"), (trainimgs,trainlabs) )
 
 
 #%% validation data save 
@@ -336,41 +328,52 @@ testlabs = labels # np.stack(labels)
 testimgs = np.concatenate(imgs,axis=0)
 print('Epoch Time: {:.2f}'.format( float(time.time() - start_time)))
 
-ut.dumpPickle(os.path.join(cf.IMG_RUN_DIR, "saved_data","test.pkl"), (testimgs,testlabs) )
+ut.dumpPickle(os.path.join(lg.saved_data,"test.pkl"), (testimgs,testlabs) )
 #%% log Config...
 lg.writeConfig(locals(), [cv.CVAE, cv.CVAE.__init__])
 lg.updatePlotDir()
+tf.config.experimental.list_physical_devices('GPU') 
+
+# copy to the current run train data to file
+np.save(os.path.join(lg.saved_data, 'train_data.npy'), train_data, allow_pickle=True)
+np.save(os.path.join(lg.saved_data, 'val_data.npy'), val_data, allow_pickle=True)
+np.save(os.path.join(lg.saved_data, 'all_data.npy'), all_data, allow_pickle=True)
 
 #%% 
-n_epochs = 555
+n_epochs = 1500
 total_epochs = 0
-epoch_n,loss_batches = trainModel(n_epochs, display_interval=5, save_interval=5, test_interval=5)
+epoch_n, curr_losses = trainModel(n_epochs, display_interval=5, save_interval=5, test_interval=5,current_losses=([],[]))
+#epoch_n,elbo_train,elbo_test = trainModel(n_epochs, display_interval=5, save_interval=5, test_interval=5)
 total_epochs += epoch_n
-
 if lg.total_epochs == total_epochs:
     print(f"sanity epoch={total_epochs}")
+else:
+    lg.reset(total_epochs=total_epochs)
 model.saveMyModel(lg.root_dir, lg.total_epochs )
 
-ut.dumpPickle(os.path.join(cf.IMG_RUN_DIR, "saved_data","losses.pkl"), loss_batches )
+#ut.dumpPickle(os.path.join(cf.IMG_RUN_DIR, "saved_data","losses.pkl"),curr_losses)
+ut.dumpPickle(os.path.join(lg.saved_data, "losses.pkl"),curr_losses)
 
+
+
+#%%
 
 
 #%% 
 
-#for test_samples, test_labels in train_dataset.take(1) : pass
+for test_samples, test_labels in test_dataset.take(1) : pass
 for train_samples, train_labels in train_dataset.take(1) : pass
 
 #%% 
 sample_index = 1
 
-for sample_index in range(32):
-    ut.showReconstruct(model, train_samples, title=lg.total_epochs, index=sample_index, show_original=True, save_fig=False, limits=cf_limits)
+for sample_index in range(10):
+    title_text = f"trained n={sample_index}"
+    ut.showReconstruct(model, train_samples, title=title_text, index=sample_index, show_original=True, save_fig=True, limits=cf_limits)
 
-#%% 
-
-for test_samples, test_labels in test_dataset.take(1) : pass
-#for train_samples, train_labels in train_dataset.take(1) : pass new environmentx=sample_index, show_original=True, save_fig=False, limits=cf_limits)
-
+for sample_index in range(10):
+    title_text = f"tested n={sample_index}"
+    ut.showReconstruct(model, test_samples, title=title_text, index=sample_index, show_original=True, save_fig=True, limits=cf_limits)
 
 ###########################
 ############################
@@ -427,118 +430,120 @@ ut.dumpPickle(os.path.join(lg.root_dir,"snk2loss.pkl"), snk2loss)
 #################
 
 
-#%% Methods for exploring the design space and getting a feel for model performance 
-def getRecons(num_to_get=10, isTest=True) :
-    model.training = False
-    if isTest:
-        dataset = test_dataset
-    else:
-        dataset = train_dataset
-    anchors, labels = [],[]
-    for anchor, label in dataset.unbatch().shuffle(100000).take(num_to_get) :
-        anchor = tf.cast(anchor, dtype=tf.float32)
-        anchors.append(anchor)
-        labels.append(label)
+# #%% Methods for exploring the design space and getting a feel for model performance 
+# def getRecons(num_to_get=10, isTest=True) :
+#     model.training = False
+#     if isTest:
+#         dataset = test_dataset
+#     else:
+#         dataset = train_dataset
+#     anchors, labels = [],[]
+#     for anchor, label in dataset.unbatch().shuffle(100000).take(num_to_get) :
+#         anchor = tf.cast(anchor, dtype=tf.float32)
+#         anchors.append(anchor)
+#         labels.append(label)
 
-    anchor_vects = [model.encode(anchors[i][None,...], reparam=True) for i in range(len(anchors))]
-    v = [model.sample(anchor_vects[i]).numpy()[...] for i in range (len(anchors))]
-
-
-    for i, sample in enumerate(v) :
-        print('Index: {}   Mid: {}'.format(i, labels[i].numpy().decode()))
-        ut.plotImg(anchors[i].numpy(), threshold=None, title='Index {} Original'.format(i), limits=cf_limits)
-        ut.plotImg(v[i],threshold=None, title='Index {} Reconstruct'.format(i), limits=cf_limits) 
-
-    print([mid.numpy().decode() for mid in labels])
-    return anchor_vects, labels
-
-def interpolateDesigns(anchor_vects, labels, index1, index2, divs=10) :
-
-    mids_string = ' {} , {} '.format(labels[index1].numpy().decode(), labels[index2].numpy().decode())
-    print(mids_string)
-    interp_vects = ut.interp(anchor_vects[index1].numpy(), anchor_vects[index2].numpy(), divs)
-
-    v = model.sample(interp_vects)
-    v = v.numpy()
-    for i, sample in enumerate(v):
-        ut.plotImgAndVect(sample,interp_vects[i], threshold=None, limits=(-4,4), show_axes=False, stats=True)
-
-#%% See a random samplling of reconstructions to choose which ones to interpolate between
-anchor_vects, labels = getRecons(num_to_get=10)
-
-#%% Interpolate between 2 set reconstructions from the previous method
-interpolateDesigns(anchor_vects, labels, 5, 9,divs=10)
+#     anchor_vects = [model.encode(anchors[i][None,...], reparam=True) for i in range(len(anchors))]
+#     v = [model.sample(anchor_vects[i]).numpy()[...] for i in range (len(anchors))]
 
 
-#%% Shapetime journey code for fun. Shapetime journey methods :
-def showRandIndices(num_to_show=100) :
-    for i in np.random.randint(0, len(shape2vec), size=num_to_show) :
-        vox = shapemodel.decode(shape2vec[mids[i]][None,...], apply_sigmoid=True)[0,...,0]
-        ut.plotImg(vox, limits = cf_limits, title=i)
+#     for i, sample in enumerate(v) :
+#         print('Index: {}   Mid: {}'.format(i, labels[i].numpy().decode()))
+#         ut.plotImg(anchors[i].numpy(), threshold=None, title='Index {} Original'.format(i), limits=cf_limits)
+#         ut.plotImg(v[i],threshold=None, title='Index {} Reconstruct'.format(i), limits=cf_limits) 
+
+#     print([mid.numpy().decode() for mid in labels])
+#     return anchor_vects, labels
+
+# def interpolateDesigns(anchor_vects, labels, index1, index2, divs=10) :
+
+#     mids_string = ' {} , {} '.format(labels[index1].numpy().decode(), labels[index2].numpy().decode())
+#     print(mids_string)
+#     interp_vects = ut.interp(anchor_vects[index1].numpy(), anchor_vects[index2].numpy(), divs)
+# 800
+#     v = model.sample(interp_vects)
+#     v = v.numpy()
+#     for i, sample in enumerate(v):
+#         ut.plotImgAndVect(sample,interp_vects[i], threshold=None, limits=(-4,4), show_axes=False, stats=True)
+
+# #%% See a random samplling of reconstructions to choose which ones to interpolate between
+# anchor_vects, labels = getRecons(num_to_get=10)
+
+# #%% Interpolate between 2 set reconstructions from the previous method
+# interpolateDesigns(anchor_vects, labels, 5, 9,divs=10)
 
 
-
-#%% Start by randomly searching for some object indices to start from
-showRandIndices(100)
-
-#%% Remember good starting indices for various categories
-start_indices = {
-    'Table'  : [7764, 6216, 3076, 2930, 715, 3165],
-    'Chair'  : [9479, 13872, 12775, 9203, 9682, 9062, 8801, 8134, 12722, 7906, 10496, 11358, 13475, 9348, 13785, 11697],
-    'Lamp'   : [15111, 15007, 14634, 14646, 15314, 14485],
-    'Faucet' : [15540, 15684, 15535, 15738, 15412],
-    'Clock'  : [16124, 16034, 16153],
-    'Bottle' : [16690, 16736, 16689],
-    'Vase'   : [17463, 17484, 17324, 17224, 17453],
-    'Laptop' : [17780, 17707, 17722],
-    'Bed'    : [18217, 18161],
-    'Mug'    : [18309, 18368, 18448],
-    'Bowl'   : [18501, 17287, 18545, 18479, 18498]}
-
-#%% Start the journey based on the previously selected indices
-#journey(journey_length = 20, vects_sample=8, max_dist=8, interp_points=6, plot_step=2, start_index = start_indices['Table'][2])
+# #%% Shapetime journey code for fun. Shapetime journey methods :
+# def showRandIndices(num_to_show=100) :
+#     for i in np.random.randint(0, len(shape2vec), size=num_to_show) :
+#         vox = shapemodel.decode(shape2vec[mids[i]][None,...], apply_sigmoid=True)[0,...,0]
+#         ut.plotImg(vox, limits = cf_limits, title=i)
 
 
 
-# import matplotlib.pyplot as plt
+# #%% Start by randomly searching for some object indices to start from
+# showRandIndices(100)
+
+# #%% Remember good starting indices for various categories
+# start_indices = {
+#     'Table'  : [7764, 6216, 3076, 2930, 715, 3165],
+#     'Chair'  : [9479, 13872, 12775, 9203, 9682, 9062, 8801, 8134, 12722, 7906, 10496, 11358, 13475, 9348, 13785, 11697],
+#     'Lamp'   : [15111, 15007, 14634, 14646, 15314, 14485],
+#     'Faucet' : [15540, 15684, 15535, 15738, 15412],
+#     'Clock'  : [16124, 16034, 16153],
+#     'Bottle' : [16690, 16736, 16689],
+#     'Vase'   : [17463, 17484, 17324, 17224, 17453],
+#     'Laptop' : [17780, 17707, 17722],
+#     'Bed'    : [18217, 18161],
+#     'Mug'    : [18309, 18368, 18448],
+#     'Bowl'   : [18501, 17287, 18545, 18479, 18498]}
+
+# #%% Start the journey based on the previously selected indices
+# #journey(journey_length = 20, vects_sample=8, max_dist=8, interp_points=6, plot_step=2, start_index = start_indices['Table'][2])
 
 
-# def plot_latent(encoder, decoder):
-#     # display a n*n 2D manifold of digits
-#     n = cf_latent_dim
-#     digit_size = 28
-#     scale = 2.0
-#     figsize = 15
-#     figure = np.zeros((digit_size * n, digit_size * n))
-#     # linearly spaced coordinates corresponding to the 2D plot
-#     # of digit classes in the latent space
-#     grid_x = np.linspace(-scale, scale, n)
-#     grid_y = np.linspace(-scale, scale, n)[::-1]
 
-#     for i, yi in enumerate(grid_y):
-#         for j, xi in enumerate(grid_x):
-#             z_sample = np.array([[xi, yi]])
-#             x_decoded = decoder.predict(z_sample)
-#             digit = x_decoded[0].reshape(digit_size, digit_size)
-#             figure[
-#                 i * digit_size : (i + 1) * digit_size,
-#                 j * digit_size : (j + 1) * digit_size,
-#             ] = digit
-
-#     plt.figure(figsize=(figsize, figsize))
-#     start_range = digit_size // 2
-#     end_range = n * digit_size + start_range + 1
-#     pixel_range = np.arange(start_range, end_range, digit_size)
-#     sample_range_x = np.round(grid_x, 1)
-#     sample_range_y = np.round(grid_y, 1)
-#     plt.xticks(pixel_range, sample_range_x)
-#     plt.yticks(pixel_range, sample_range_y)
-#     plt.xlabel("z[0]")
-#     plt.ylabel("z[1]")
-#     plt.imshow(figure, cmap="Greys_r")
-#     plt.show()
+# # import matplotlib.pyplot as plt
 
 
-# plot_latent(model.enc_model, model.gen_model)
+# # def plot_latent(encoder, decoder):
+# #     # display a n*n 2D manifold of digits
+# #     n = cf_latent_dim
+# #     digit_size = 28
+# #     scale = 2.0
+# #     figsize = 15
+# #     figure = np.zeros((digit_size * n, digit_size * n))
+# #     # linearly spaced coordinates corresponding to the 2D plot
+# #     # of digit classes in the latent space
+# #     grid_x = np.linspace(-scale, scale, n)
+# #     grid_y = np.linspace(-scale, scale, n)[::-1]
+
+# #     for i, yi in enumerate(grid_y):
+# #         for j, xi in enumerate(grid_x):
+# #             z_sample = np.array([[xi, yi]])
+# #             x_decoded = decoder.predict(z_sample)
+# #             digit = x_decoded[0].reshape(digit_size, digit_size)
+# #             figure[
+# #                 i * digit_size : (i + 1) * digit_size,
+# #                 j * digit_size : (j + 1) * digit_size,
+# #             ] = digit
+
+# #     plt.figure(figsize=(figsize, figsize))
+# #     start_range = digit_size // 2
+# #     end_range = n * digit_size + start_range + 1
+# #     pixel_range = np.arange(start_range, end_range, digit_size)
+# #     sample_range_x = np.round(grid_x, 1)
+# #     sample_range_y = np.round(grid_y, 1)
+# #     plt.xticks(pixel_range, sample_range_x)
+# #     plt.yticks(pixel_range, sample_range_y)
+# #     plt.xlabel("z[0]")
+# #     plt.ylabel("z[1]")
+# #     plt.imshow(figure, cmap="Greys_r")
+# #     plt.show()
+
+
+# # plot_latent(model.enc_model, model.gen_model)
+
+# # %%
 
 # %%

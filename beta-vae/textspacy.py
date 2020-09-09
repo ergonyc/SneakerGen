@@ -118,6 +118,7 @@ class TextSpacy(tf.keras.Model):
 
     def restoreLatestMyModel(self, dir_path):
         latest = tf.train.latest_checkpoint(dir_path)
+        print(f"restored this model: {latest}")
         self.model.load_weights(latest)
 
     def setLR(self, learning_rate):

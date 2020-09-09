@@ -1,0 +1,8 @@
+## script for installing baseTF_38
+conda activate baseTF_38
+conda install pydot graphviz
+conda install scikit-learn matplotlib seaborn tqdm plotly
+
+pip install --upgrade tensorflow
+
+conda install --name baseTF_38 ipykernel -y

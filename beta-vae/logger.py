@@ -60,7 +60,7 @@ class logger:
             if self.root_dir.split("/")[-2] == "txtruns":
                 print(f"root_dir already txtruns= {self.root_dir}")
             else:
-                self.root_dir = self.root_dir.replace("runs", "txtruns")
+                self.root_dir = self.root_dir.replace("imgruns", "txtruns")
                 print(f"changed to text runs:root_dir= {self.root_dir}")
 
         self.img_in_dir = cf.IMAGE_FILEPATH
@@ -108,11 +108,11 @@ class logger:
 
     def restoreCP(self, path=None):
         if not os.path.isdir(self.root_dir):
-            print("No folder found, not restored.")
+            print(f"folder ({self.root_dir}) not found, not restored.")
             return
         if path == None:
             status = self.checkpoint.restore(self.cpmanager.latest_checkpoint)
-            print("Latest model chkp path is : {} etl.set_dir...".format(self.cpmanager.latest_checkpoint))
+            print("(NONE)Latest model chkp path is : {} etl.set_dir...".format(self.cpmanager.latest_checkpoint))
             #etl.set_dir(self.tblogs)
             return status
         else:

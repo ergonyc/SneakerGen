@@ -25,7 +25,7 @@ import random as rn
 import spacy
 
 # import en_core_web_lg
-import displacy
+#import displacy
 
 # from nltk.corpus import wordnet as wn
 import math
@@ -45,6 +45,8 @@ corpdict = {}
 # catids_to_load = [4379243,3001627,3636649,3325088,3046257,2876657,3593526,3642806,2818832,3797390,2880940]
 
 dfdesc = pd.read_csv(cf.META_DATA_CSV)
+# fix the root directory....
+
 
 #%% Setup spacy and some related methods
 def get_embeddings(vocab):
@@ -81,28 +83,29 @@ for orth in nlp.vocab.vectors:
 
 #%%  get vocab
 
-nlp = en_core_web_lg.load()
+# nlp = en_core_web_lg.load()
 
-# remove the empty placeholder prob table
-if nlp.vocab.lookups_extra.has_table("lexeme_prob"):
-    nlp.vocab.lookups_extra.remove_table("lexeme_prob")
+# # remove the empty placeholder prob table
+# if nlp.vocab.lookups_extra.has_table("lexeme_prob"):
+#     nlp.vocab.lookups_extra.remove_table("lexeme_prob")
 
-# access any `.prob` to load the full table into the model
-assert nlp.vocab["a"].prob == -3.9297883511
+# # access any `.prob` to load the full table into the model
+# assert nlp.vocab["a"].prob == -3.9297883511
 
 
-# n_vectors = 105000  # number of vectors to keep
-# removed_words = nlp.vocab.prune_vectors(n_vectors)
+# # n_vectors = 105000  # number of vectors to keep
+# # removed_words = nlp.vocab.prune_vectors(n_vectors)
 
-# assert len(nlp.vocab.vectors) <= n_vectors  # unique vectors have been pruned
-# assert nlp.vocab.vectors.n_keys > n_vectors  # but not the total entries
-# embeddings = get_embeddings(nlp.vocab)
+# # assert len(nlp.vocab.vectors) <= n_vectors  # unique vectors have been pruned
+# # assert nlp.vocab.vectors.n_keys > n_vectors  # but not the total entries
+# # embeddings = get_embeddings(nlp.vocab)
 
 
 #%% Generate all descriptions and stack them into a numpy array
 # all_descs = []
 # for row in tqdm(dfdesc.iterrows()):
 #     all_descs.append([row.hero_fullpath, row.description])
+
 
 all_descs = [list(z) for z in zip(dfdesc["hero_fullpath"], dfdesc["description"])]
 
@@ -243,7 +246,61 @@ def joinPhrases(phrases):
 
 # def printDetArr(det, max_level=10):
 #     for item in det:
-#         name, level, children, quantity = (item[0]).lower(), int(item[1]), int(item[2]), int(item[3])
+#         name, level, children, quantity = (item[0]).lower(), int(item[1])
+# nlp = en_core_web_lg.load()
+
+# # remove the empty placeholder prob table
+# if nlp.vocab.lookups_extra.has_table("lexeme_prob"):
+#     nlp.vocab.lookups_extra.remove_table("lexeme_prob")
+
+# # access any `.prob` to load the full table into the model
+# assert nlp.vocab["a"].prob == -3.9297883511
+
+
+# # n_vectors = 105000  # number of vectors to keep
+# # removed_words = nlp.vocab.prune_vectors(n_vectors)
+# nlp = en_core_web_lg.load()
+
+# # remove the empty placeholder prob table
+# if nlp.vocab.lookups_extra.has_table("lexeme_prob"):
+#     nlp.vocab.lookups_extra.remove_table("lexeme_prob")
+
+# # access any `.prob` to load the full table into the model
+# assert nlp.vocab["a"].prob == -3.9297883511
+
+s)
+    vectors = np.zeros((max_rank + 1, vocab.vectors_length), dtype="float32")
+    for lex in lexemes:s)
+    vectors = np.zeros((max_rank + 1, vocab.vectors_length), dtype="float32")
+    for lex in lexemes:
+        if lex.has_vector:
+        if lex.has_vector:
+# # n_vectors = 105000  # number of vectors to keep
+# # removed_words = nlp.vocab.prune_vectors(n_vectors)
+
+# # assert len(nlp.vocab.vectors) <= n_vectors  # unique vectors have been pruned
+# # assert nlp.vocab.vectors.n_keys > n_vectors  # but not the total entries
+# # embeddings = get_embeddings(nlp.vocab)
+
+# # assert len(nlp.vocab.vectors) <= n_vectors  # unique vectors have been 
+# nlp = en_core_web_lg.load()
+
+# # remove the empty placeholder prob table
+# if nlp.vocab.lookups_extra.has_table("lexeme_prob"):
+#     nlp.vocab.lookups_extra.remove_table("lexeme_prob")s)
+    vectors = np.zeros((max_rank + 1, vocab.vectors_length), dtype="float32")
+    for lex in lexemes:
+        if lex.has_vector:
+
+
+# # n_vectors = 105000  # number of vectors to keep
+# # removed_words = nlp.vocab.prune_vectors(n_vectors)
+
+# # assert len(nlp.vocab.vectors) <= n_vectors  # unique vectors have been pruned
+# # assert nlp.vocab.vectors.n_keys > n_vectors  # but not the total entries
+# # embeddings = get_embeddings(nlp.vocab)pruned
+# # assert nlp.vocab.vectors.n_keys > n_vectors  # but not the total entries
+# # embeddings = get_embeddings(nlp.vocab), int(item[2]), int(item[3])
 #         if level > max_level:
 #             continue
 #         freq = corpdict[name]
@@ -262,6 +319,22 @@ def detToArr(details):
 
 
 def listSubcats(catid):
+# nlp = en_core_web_lg.load()
+
+# # remove the empty placeholder prob table
+# if nlp.vocab.lookups_extra.has_table("lexeme_prob"):
+#     nlp.vocab.lookups_extra.remove_table("lexeme_prob")
+
+# # access any `.prob` to load the full table into the model
+# assert nlp.vocab["a"].prob == -3.9297883511
+
+
+# # n_vectors = 105000  # number of vectors to keep
+# # removed_words = nlp.vocab.prune_vectors(n_vectors)
+
+# # assert len(nlp.vocab.vectors) <= n_vectors  # unique vectors have been pruned
+# # assert nlp.vocab.vectors.n_keys > n_vectors  # but not the total entries
+# # embeddings = get_embeddings(nlp.vocab)
     allsubcats = []
     dffilter = dfdesc[dfdesc.cattext == cats_to_load[catid]]
     for i, row in dffilter.iterrows():

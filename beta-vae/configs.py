@@ -9,7 +9,7 @@ import os
 
 
 LATENT_DIM = 128
-IMG_SIZE = 192  # 224, 256 (128)
+IMG_SIZE = 256 #192  # 224, 256 (128)
 
 #%% Properties
 # This folder path should only exist on the remote machine
@@ -46,7 +46,7 @@ else:  # Running locally
     This is the location of the image data scraped from GOAT and SNS. 
     """
 
-    IMG_RUN_DIR = HOME + "/Projects/Project2.0/SnkrGen/beta-vae/runs/"
+    IMG_RUN_DIR = HOME + "/Projects/Project2.0/SnkrGen/beta-vae/imgruns/"
     TXT_RUN_DIR = HOME + "/Projects/Project2.0/SnkrGen/beta-vae/txtruns/"
     """
     These are the run log and model checkpoint folders. This folder structure is generated and managed by the logger.py class.
@@ -77,6 +77,8 @@ else:  # Running locally
     │   │   ├── ckpt-258.data-00001-of-00002
     │   │   ├── ckpt-258.index
     │   │   └── epoch_258.h5
+    │   ├── saved_data
+
     │   └── plots
         ...
     """

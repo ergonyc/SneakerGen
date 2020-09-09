@@ -606,6 +606,8 @@ def plotImg(
         _ = fig.savefig(os.path.join(plot_out_dir, title))
     if show_fig:
         _ = plt.show()
+
+    # DO WE NEED TO CLOSE THE PLOT??
     return
 
 
