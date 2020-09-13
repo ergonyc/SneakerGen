@@ -57,14 +57,15 @@ class Logger(object):
         # create the writer in one process and try to use it in a forked
         # process. And because EventsFileWriter uses a subthread to do the
         # actual writing, EventsFileWriter /isn't/ fork-safe.
-        self.writer = pywrap_tensorflow.EventsWriter(compat.as_bytes(path))
-
+        #self.writer = pywrap_tensorflow.EventsWriter(compat.as_bytes(path))
+        self.writer = tf.summary.create_file_writer(path)
+    
     def set_writer(self, writer):
         """
         Set the log writer to an existing tf.summary.FileWriter instance
         (so that you can write both TensorFlow summaries and easy_tf_log events to the same log file)
         """
-        self.writer = c(writer)
+        self.writer = EventsFileWriterWrapper(writer)
 
     def logkv(self, k, v, step=None):
         self.log_key_value(k, v, step)
@@ -72,7 +73,7 @@ class Logger(object):
     def log_key_value(self, key, value, step=None):
         def summary_val(k, v):
             kwargs = {"tag": k, "simple_value": float(v)}
-            return cSummary.Value(**kwargs)
+            return tf.compat.v1.Summary.Value(**kwargs)
 
         summary = tf.compat.v1.Summary(value=[summary_val(key, value)])
         event = event_pb2.Event(wall_time=time.time(), summary=summary)

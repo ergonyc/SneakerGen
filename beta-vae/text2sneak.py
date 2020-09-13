@@ -63,6 +63,12 @@ cf_img_size = 192  #should this just read from config... or from a config loaded
 img_run_id = "0908-2320"   # last full image training runs cf_img_size =  256
 cf_img_size = 256  #should this just read from config... or from a config loaded in run_id
 
+img_run_id = "0910-1539"   # last full image training runs cf_img_size =  256
+cf_img_size = 256  #should this just read from config... or from a config loaded in run_id
+
+img_run_id = "0911-1516"   # last full image training runs cf_img_size =  256
+cf_img_size = 192  #should this just read from config... or from a config loaded in run_id
+
 snk2vec = ut.loadPickle(os.path.join(cf.IMG_RUN_DIR, img_run_id, "snk2vec.pkl"))
 
 # infile = open(os.path.join(cf.SHAPE_RUN_DIR, img_run_id, "snk2vec.pkl"),'rb')
@@ -271,7 +277,7 @@ if train_from_scratch:
     lg = logger.logger(trainMode=True, txtMode=True)
 
 else:  # TODO:  making the model actually load is nescessary
-    txt_run_id = "0908-0240"
+    txt_run_id = "0909-0413"
     total_epochs =  1200
     root_dir = os.path.join(cf.TXT_RUN_DIR, txt_run_id)
     lg = logger.logger(trainMode=True,root_dir=root_dir, txtMode=True)
@@ -426,9 +432,9 @@ lg.writeConfig(locals(),[ts])  #this atually makes the directories...
 # txtmodel.saveMyModel(lg.root_dir, lg.total_epochs )
 
 #%%
-n_epochs = 8000
+n_epochs = 12000
 total_epochs = 0
-epoch_n, curr_losses = trainModel(n_epochs, save_interval=10, test_interval=10,current_losses=([],[]))
+epoch_n, curr_losses = trainModel(n_epochs, save_interval=20, test_interval=20,current_losses=([],[]))
 #epoch_n,elbo_train,elbo_test = trainModel(n_epochs, display_interval=5, save_interval=5, test_interval=5)
 total_epochs += epoch_n
 if lg.total_epochs == total_epochs:

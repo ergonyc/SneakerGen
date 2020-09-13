@@ -340,9 +340,9 @@ np.save(os.path.join(lg.saved_data, 'val_data.npy'), val_data, allow_pickle=True
 np.save(os.path.join(lg.saved_data, 'all_data.npy'), all_data, allow_pickle=True)
 
 #%% 
-n_epochs = 1500
+n_epochs = 3000
 total_epochs = 0
-epoch_n, curr_losses = trainModel(n_epochs, display_interval=5, save_interval=5, test_interval=5,current_losses=([],[]))
+epoch_n, curr_losses = trainModel(n_epochs, display_interval=10, save_interval=10, test_interval=10,current_losses=([],[]))
 #epoch_n,elbo_train,elbo_test = trainModel(n_epochs, display_interval=5, save_interval=5, test_interval=5)
 total_epochs += epoch_n
 if lg.total_epochs == total_epochs:
