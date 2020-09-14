@@ -69,6 +69,9 @@ cf_img_size = 256  #should this just read from config... or from a config loaded
 img_run_id = "0911-1516"   # last full image training runs cf_img_size =  256
 cf_img_size = 192  #should this just read from config... or from a config loaded in run_id
 
+img_run_id = "0912-2052"   # last full image training runs cf_img_size =  256
+cf_img_size = 192  #should this just read from config... or from a config loaded in run_id
+
 snk2vec = ut.loadPickle(os.path.join(cf.IMG_RUN_DIR, img_run_id, "snk2vec.pkl"))
 
 # infile = open(os.path.join(cf.SHAPE_RUN_DIR, img_run_id, "snk2vec.pkl"),'rb')
@@ -432,7 +435,7 @@ lg.writeConfig(locals(),[ts])  #this atually makes the directories...
 # txtmodel.saveMyModel(lg.root_dir, lg.total_epochs )
 
 #%%
-n_epochs = 12000
+n_epochs = 8000
 total_epochs = 0
 epoch_n, curr_losses = trainModel(n_epochs, save_interval=20, test_interval=20,current_losses=([],[]))
 #epoch_n,elbo_train,elbo_test = trainModel(n_epochs, display_interval=5, save_interval=5, test_interval=5)
