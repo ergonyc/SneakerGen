@@ -49,7 +49,7 @@ class TextSpacy(tf.keras.Model):
                 weights=[spacy_embeddings],
             )
         )
-        model.add(SpatialDropout1D(self.dropoutRate))
+        model.add(SpatialDropout1D(self.dropoutRate))sudo apt install gnome-tweak-tool
         model.add(Bidirectional(LSTM(64, return_sequences=True, kernel_regularizer=regularizers.l2(0.001))))
         model.add(Dropout(self.dropoutRate))
         model.add(Bidirectional(LSTM(128, return_sequences=True, kernel_regularizer=regularizers.l2(0.001))))

@@ -28,8 +28,10 @@ DROPOUT_RATE = 0.15
 
 #%% CVAE Class that extends the standard keras model
 class CVAE(tf.keras.Model):
-    def __init__(self, latent_dim, input_dim, learning_rate=6e-4, training=True):
+    def __init__(self, latent_dim, input_dim, learning_rate=6e-4, training=True, kl_weight=1, name="autoencoder"):
         super(CVAE, self).__init__()
+
+        self.kl_weight = kl_weight
 
         self.optimizer = tf.keras.optimizers.Adam(6e-4)
         self.latent_dim = latent_dim
@@ -183,7 +185,8 @@ class CVAE(tf.keras.Model):
         return self.decode(eps, apply_sigmoid=True)
 
     def encode(self, x, reparam=False):
-        mean, logvar = tf.split(self.enc_model(x, training=self.training), num_or_size_splits=2, axis=-1)
+        #AH: changed axis=1 from axis=-1
+        mean, logvar = tf.split(self.enc_model(x, training=self.training), num_or_size_splits=2, axis=1)
         if reparam:
             return self.reparameterize(mean, logvar)
         return mean, logvar
@@ -201,7 +204,7 @@ class CVAE(tf.keras.Model):
 
     def log_normal_pdf(self, sample, mean, logvar, raxis=1):
         log2pi = tf.math.log(2.0 * np.pi)
-        return tf.reduce_sum(-0.5 * ((sample - mean) ** 2.0 * tf.exp(-logvar) + logvar + log2pi), axis=raxis)
+        return tf.math.reduce_sum(-0.5 * ((sample - mean) ** 2.0 * tf.math.exp(-logvar) + logvar + log2pi), axis=raxis)
 
     def compute_test_loss(self, x):
         temp_training = self.training
@@ -211,32 +214,71 @@ class CVAE(tf.keras.Model):
         x_logit = self.decode(z)
 
         cross_ent = tf.nn.sigmoid_cross_entropy_with_logits(logits=x_logit, labels=x)
-        logpx_z = -tf.reduce_sum(cross_ent, axis=[1, 2, 3])  # JAH removed 3D axis=[1, 2, 3,4]
+        logpx_z = -tf.math.reduce_sum(cross_ent, axis=[1, 2, 3])  # JAH removed 3D axis=[1, 2, 3,4]
         logpz = self.log_normal_pdf(z, 0.0, 0.0)
         logqz_x = self.log_normal_pdf(z, mean, logvar)
-        test_loss = -tf.reduce_mean(logpx_z + logpz - logqz_x)
+
+        kl_divergence = logqz_x - logpz
+        neg_log_likelihood = logpx_z
+
+        #test_loss = -tf.reduce_mean(logpx_z + logpz - logqz_x)
+        #return test_loss
+        elbo = tf.math.reduce_mean(-self.kl_weight * kl_divergence - neg_log_likelihood)  # shape=()
         self.training = temp_training
-        return test_loss
+        return -elbo
 
     @tf.function
     def compute_loss(self, x):
+        # this is averaged over the batche... os is technically a "COST" rather than loss
         mean, logvar = self.encode(x)
         z = self.reparameterize(mean, logvar)
         x_logit = self.decode(z)
 
         cross_ent = tf.nn.sigmoid_cross_entropy_with_logits(logits=x_logit, labels=x)
         logpx_z = -tf.reduce_sum(cross_ent, axis=[1, 2, 3])  # JAH removed 3D axis=[1, 2, 3,4]
+
         logpz = self.log_normal_pdf(z, 0.0, 0.0)
         logqz_x = self.log_normal_pdf(z, mean, logvar)
-        return -tf.reduce_mean(logpx_z + logpz - logqz_x)
+        kl_divergence = logqz_x - logpz
+        neg_log_likelihood = logpx_z
+        #return -tf.reduce_mean(logpx_z + logpz - logqz_x)
+        elbo = tf.math.reduce_mean(-self.kl_weight * kl_divergence - neg_log_likelihood)  # shape=()
+        return -elbo
+
+    # vae cost function as negative ELBO
+    @tf.function
+    def vae_cost(self, x_true):
+        mu, logvar = self.encode(x_true)
+        z_sample = self.reparameterize(mu,logvar)
+        x_recons_logits = self.decode(z_sample)
+        # compute cross entropy loss for each dimension of every datapoint
+        raw_cross_entropy = tf.nn.sigmoid_cross_entropy_with_logits(labels=x_true,
+                            logits=x_recons_logits)  #
+        # compute cross entropy loss for all instances in mini-batch; shape=(batch_size,)
+        neg_log_likelihood = tf.math.reduce_sum(raw_cross_entropy, axis=[1, 2, 3])
+        # through MC approximation with one sample
+    
+        # logpz = normal_log_pdf(z_sample, 0., 1.)  # shape=(batch_size,)
+        # logqz_x = normal_log_pdf(z_sample, mu, tf.math.square(sd))  # shape=(batch_size,)
+        logpz = self.log_normal_pdf(z_sample, 0., 0.)  # shape=(batch_size,)
+        logqz_x = self.log_normal_pdf(z_sample, mu, logvar)  # shape=(batch_size,)
+        kl_divergence = logqz_x - logpz
+
+        elbo = tf.math.reduce_mean(-self.kl_weight * kl_divergence - neg_log_likelihood)  # shape=()
+        return -elbo
+
 
     @tf.function
     def trainStep(self, x):
         with tf.GradientTape() as tape:
-            loss = self.compute_loss(x)
-        gradients = tape.gradient(loss, self.trainable_variables)
+            #loss = self.compute_loss(x)
+            cost_mini_batch = self.vae_cost(x)
+
+        gradients = tape.gradient(cost_mini_batch, self.trainable_variables)
+        #gradients = tape.gradient(loss, self.trainable_variables)
         self.optimizer.apply_gradients(zip(gradients, self.trainable_variables))
-        return loss
+        return cost_mini_batch # loss
+
 
     def compileModels(self):
         self.gen_model.compile(optimizer=self.optimizer)

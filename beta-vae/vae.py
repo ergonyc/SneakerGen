@@ -64,11 +64,9 @@ cf_img_size = cf.IMG_SIZE
 cf_latent_dim = cf.LATENT_DIM
 cf_batch_size = 32
 cf_learning_rate = 4e-4
+cf_limits = [cf_img_size, cf_img_size]
 #( *-*) ( *-*)>⌐■-■ ( ⌐■-■)
-
-# cf_limits=[cf_img_size, cf_img_size, cf_img_size]
-cf_limits=[cf_img_size, cf_img_size]
-#ut.readMeta()
+#
 dfmeta = ut.readMeta()
 
 tf.config.experimental.list_physical_devices('GPU') 
@@ -82,11 +80,11 @@ def plotIO(model):
 
 
 #%% Make model and print info
-model = cv.CVAE(cf_latent_dim, cf_img_size, cf_learning_rate, training=True)
+model = cv.CVAE(cf_latent_dim, cf_img_size, learning_rate=cf_learning_rate, kl_weight=3, training=True)
 ### instance of model used in GOAT blog
 #model = cv.CVAE_EF(cf_latent_dim, cf_img_size, cf_learning_rate, training=True)
 
-model.setLR(cf_learning_rate)
+#model.setLR(cf_learning_rate)
 model.printMSums()
 model.printIO()
 plotIO(model.enc_model)
@@ -97,7 +95,7 @@ train_from_scratch = True
 if train_from_scratch :
     lg = logger.logger(trainMode=True, txtMode=False)
 else :
-    shp_run_id = '0907-2325'  
+    shp_run_id = '0922-1614'  
     root_dir = os.path.join(cf.IMG_RUN_DIR, shp_run_id)
     lg = logger.logger(root_dir=root_dir, trainMode=True, txtMode=False)
 
@@ -165,7 +163,7 @@ all_dat = np.load(os.path.join(cf.DATA_DIR, 'all_data.npy'))
 
 
 
-#%% # LOAD & PREPROCESS the from list of files
+#%% # LOAD & PREPROCESS the from list of filessudo apt install gnome-tweak-tool
 
 
 train_dataset = tf.data.Dataset.from_tensor_slices(train_dat)
@@ -198,17 +196,6 @@ for _ in train_dataset :
 
 # #%% Setup datasets
 sample_index = 1
-# for sample_index in range(0,20):
-#     ut.plotImg(train_samples[sample_index], title='train', threshold=0.5, limits=cf_limits, save_fig=False)
-#     ut.plotImg(test_samples[sample_index], title='test', threshold=0.5, limits=cf_limits, save_fig=False)
-# #%% Show initial models
-
-# if (lg.total_epochs > 10) :
-#     ut.plotVox(model.reconstruct(test_samples[sample_index][None,...], training=False), limits=cf_limits, title='Recon')
-
-# sample_index = 6
-# ut.plotImg(train_samples[sample_index], title='train', threshold=0.5, limits=cf_limits, save_fig=False)
-# ut.plotImg(test_samples[sample_index], title='test', threshold=0.5, limits=cf_limits, save_fig=False)
 
 #%% Training methods
 def getTestSetLoss(dataset, batches=0) :
@@ -224,8 +211,7 @@ def trainModel(epochs, display_interval=-1, save_interval=10, test_interval=10,c
     print('\n\nStarting training...\n')
     model.training=True
     elbo_test,elbo_train = current_losses
-    # elbo_test = []
-    # elbo_train = []
+
     for epoch in range(1, epochs + 1):
         start_time = time.time()
         losses = []
@@ -237,10 +223,18 @@ def trainModel(epochs, display_interval=-1, save_interval=10, test_interval=10,c
             loss_batch = model.trainStep(train_x)
             losses.append(loss_batch)
             stdout.write("\r[{:3d}/{:3d}]  ".format(batch_index, total_train_batchs))
-            stdout.flush()
+            stdout.flush()  
+
             batch_index = batch_index + 1
 
+        ## TRAIN LOSS
         elbo = np.mean(losses)
+        print('Epoch: {}   Train loss: {:.1f}   Epoch Time: {:.2f}'.format(lg.total_epochs, 
+                            float(elbo),
+                            float(time.time() - start_time)) )
+
+        lg.logMetric(elbo, 'train loss',test=False)
+        elbo_train.append(elbo)
 
         if ((display_interval > 0) & (epoch % display_interval == 0)) :
             if epoch == 1:
@@ -248,21 +242,18 @@ def trainModel(epochs, display_interval=-1, save_interval=10, test_interval=10,c
             else:
                 ut.showReconstruct(model, test_samples, title=lg.total_epochs, index=sample_index, show_original=False, save_fig=True, limits=cf_limits)
 
+        ## TEST LOSSin chekmakedirs
         if epoch % test_interval == 0:
-            #test_loss2 = getTestSetLoss(test_dataset, 2)  # what should I do here??/ batch of 2???  shouldn't it be batch size??
             test_loss = getTestSetLoss(test_dataset, cf_batch_size)  # what should I do here??/ batch of 2???  shouldn't it be batch size??
-            print('   TEST LOSS  : {:.1f}    for epoch: {}'.format(test_loss, lg.total_epochs))
-            #print('   TEST LOSS 2: {:.1f}    for epoch: {}'.format(test_loscurrent_lossess2, lg.total_epochs))
-            lg.logMetric(test_loss, 'test loss')
-            #loss_batch2.append(test_loss2)
+            print('   TEST LOSS  : {:.1f}    for epoch: {}'.format(test_loss, 
+                                                        lg.total_epochs))
+            lg.logMetric(test_loss, 'test loss',test=True)
             elbo_test.append(test_loss)
 
+        ## SAVE
         if epoch % save_interval == 0:
             lg.cpSave()
 
-        print('Epoch: {}   Train loss: {:.1f}   Epoch Time: {:.2f}'.format(lg.total_epochs, float(elbo), float(time.time() - start_time)))
-        lg.logMetric(elbo, 'train loss')
-        elbo_train.append(elbo)
 
         lg.incrementEpoch()
 
@@ -278,7 +269,6 @@ def trainModel(epochs, display_interval=-1, save_interval=10, test_interval=10,c
 
 #%% Training data save
 start_time = time.time()
-losses = []
 batch_index = 1
 imgs = []
 labels = []
@@ -296,7 +286,7 @@ for train_x, label in train_dataset :
 
 trainimgs = np.concatenate(imgs,axis=0)
 trainlabs = labels # np.stack(labels)
-
+False
 print('Epoch Time: {:.2f}'.format( float(time.time() - start_time)))
 
 #path = os.path.join(cf.IMG_RUN_DIR, "saved_data","train")
@@ -340,9 +330,9 @@ np.save(os.path.join(lg.saved_data, 'val_data.npy'), val_data, allow_pickle=True
 np.save(os.path.join(lg.saved_data, 'all_data.npy'), all_data, allow_pickle=True)
 
 #%% 
-n_epochs = 3000
+n_epochs = 310000
 total_epochs = 0
-epoch_n, curr_losses = trainModel(n_epochs, display_interval=10, save_interval=10, test_interval=10,current_losses=([],[]))
+epoch_n, curr_losses = trainModel(n_epochs, display_interval=5, save_interval=10, test_interval=5,current_losses=([],[]))
 #epoch_n,elbo_train,elbo_test = trainModel(n_epochs, display_interval=5, save_interval=5, test_interval=5)
 total_epochs += epoch_n
 if lg.total_epochs == total_epochs:

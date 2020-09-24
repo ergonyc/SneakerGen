@@ -9,7 +9,7 @@ import os
 
 
 LATENT_DIM = 128
-IMG_SIZE = 192  # 224, 256 (128)
+IMG_SIZE = 224  # 224, 256 (128)
 
 #%% Properties
 # This folder path should only exist on the remote machine

@@ -29,7 +29,7 @@ The models folder contains all of the saved models from training.
 The plots folder contains any output plots during training such as shape reconstructions.    
 """
 
-#HACK... remove easy_tf2_log... its not working....
+#HACK... remove easy_tf2_log... its not working.... putting tf2 loggin into the logger.
 
 #%% Imports
 import os
@@ -37,12 +37,11 @@ import inspect
 import csv
 
 import utils as ut
-#import easy_tf2_log as etl
 import tensorflow as tf
 import configs as cf
 
 #%% Logger class
-class logger:
+class logger: 
     def __init__(self, run_name="", root_dir=None, trainMode=False, txtMode=False):
         self.remote = cf.REMOTE
         self.training = trainMode or self.remote
@@ -67,30 +66,57 @@ class logger:
         self.plot_out_dir = os.path.join(self.root_dir, "plots/")
         self.model_saves = os.path.join(self.root_dir, "models/")
         self.tblogs = os.path.join(self.root_dir, "logs")
-        self.saved_data = os.path.join(
-            self.root_dir, "saved_data"
-        )  # for writing test and validate pkl record of dataset
+        self.test_writer = None
+        self.train_writer = None
 
+        # for writing test and validate pkl record of dataset
+        self.saved_data = os.path.join( self.root_dir, "saved_data")  
         self.updatePlotDir()
+        
 
     def checkMakeDirs(self):
-        if os.path.isdir(self.root_dir):
-            return
-        if self.training:
-            os.mkdir(self.root_dir)
-            os.mkdir(ut.plot_out_dir)
-            os.mkdir(self.model_saves)
-            os.mkdir(self.tblogs)
-            os.mkdir(self.saved_data)
+        def makeDir(dirname):
+            if os.path.isdir(dirname):
+                return
+            else:
+                os.mkdir(dirname)
+
+        makeDir(self.root_dir)
+        makeDir(ut.plot_out_dir)
+        makeDir(self.model_saves)
+        makeDir(self.tblogs)
+        makeDir(self.saved_data)
+        #print(f"made {self.saved_data}")
+        self.setupWriter()
+
+
+    def setupWriter(self):
+        ##  need to make tensorflow logs
+        if self.test_writer is None:
+            train_log_dir = self.tblogs + '/train'
+            test_log_dir = self.tblogs + '/test'
+            train_summary_writer = tf.summary.create_file_writer(train_log_dir)
+            test_summary_writer = tf.summary.create_file_writer(test_log_dir)
             #etl.set_dir(self.tblogs)
+            self.test_writer = test_summary_writer
+            self.train_writer = test_summary_writer
+
 
     def reset(self, total_epochs=1):
         self.total_epochs = total_epochs
 
-    def logMetric(self, metric, name):
+    def logMetric(self, metric, name, test=False):
         self.checkMakeDirs()
-        #etl.tflog(name, metric, step=self.total_epochs)
+        if test:
+            summary_writer = self.test_writer
+        else:
+            summary_writer = self.train_writer
 
+        with summary_writer.as_default():
+            tf.summary.scalar(name=name,data=metric, step=self.total_epochs)
+    
+            # tb_callback = tf.keras.callbacks.TensorBoard(LOG_DIR)
+        # tb_callback.set_model(model)
     def incrementEpoch(self):
         self.total_epochs = self.total_epochs + 1
 
@@ -99,9 +125,14 @@ class logger:
             self.checkpoint = tf.train.Checkpoint(optimizer=opt, generator=generator)
         else:
             self.checkpoint = tf.train.Checkpoint(optimizer=opt, generator=generator, encoder=encoder)
+
         self.cpmanager = tf.train.CheckpointManager(
             self.checkpoint, directory=self.model_saves, max_to_keep=(3 if (self.remote) else 999)
         )
+        # AH add for better tensorboard??
+        # tb_callback = tf.keras.callbacks.TensorBoard(LOG_DIR)
+        # tb_callback.set_model(model)        # tb_callback = tf.keras.callbacks.TensorBoard(LOG_DIR)
+        # tb_callback.set_model(model)
 
     def cpSave(self):
         self.cpmanager.save()
@@ -112,13 +143,15 @@ class logger:
             return
         if path == None:
             status = self.checkpoint.restore(self.cpmanager.latest_checkpoint)
-            print("(NONE)Latest model chkp path is : {} etl.set_dir...".format(self.cpmanager.latest_checkpoint))
+            print("(NONE)Latest model chkp path is : {} setupWriter...".format(self.cpmanager.latest_checkpoint))
             #etl.set_dir(self.tblogs)
+            self.setupWriter()
             return status
         else:
             status = self.checkpoint.restore(path)
-            print("Latest model chkp path is : {}  etl.set_dir".format(status))
+            print("Latest model chkp path is : {}  setupWriter".format(status))
             #etl.set_dir(self.tblogs)
+            self.setupWriter()
             return status
 
     def writeConfig(self, variables, code):
