@@ -42,6 +42,7 @@ plot_out_dir = "."
 tax = []
 meta = []
 kernel = "none"
+cf_max_length = 200
 
 #%% Basic Functions
 def minmax(arr):
@@ -440,7 +441,6 @@ def make_gif_from_dir(gif_in_dir, name):
         "convert -delay 15 -loop 0 " + gif_in_dir + "*{000..XXX}.png " + str(name) + ".gif", shell=True
     )
 
-
 def _padEnc(text, vocab):
     texts = text if type(text) == list else [text]
     lexs = [[vocab[t].rank for t in sent.replace(".", " . ").split(" ") if len(t) > 0] for sent in texts]
@@ -449,8 +449,8 @@ def _padEnc(text, vocab):
     return padded
 
 
-def _getImg(text, snkmodel, textmodel, nlp):
-    ptv = padEnc(text, nlp)
+def _get_img(text, snkmodel, textmodel, nlp):
+    ptv = _padEnc(text, nlp)
     preds = textmodel.sample(ptv)
     img = snkmodel.sample(preds).numpy()[0, ..., 0]
     return img, preds

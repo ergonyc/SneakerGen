@@ -87,7 +87,7 @@ class logger:
         make_dir(self.tblogs)
         make_dir(self.saved_data)
         #print(f"made {self.saved_data}")
-        self.setupWriter()
+        self.setup_writer()
 
 
     def setup_writer(self):
@@ -97,9 +97,8 @@ class logger:
             test_log_dir = self.tblogs + '/test'
             train_summary_writer = tf.summary.create_file_writer(train_log_dir)
             test_summary_writer = tf.summary.create_file_writer(test_log_dir)
-            #etl.set_dir(self.tblogs)
             self.test_writer = test_summary_writer
-            self.train_writer = test_summary_writer
+            self.train_writer = train_summary_writer
 
 
     def reset(self, total_epochs=1):
@@ -145,13 +144,13 @@ class logger:
             status = self.checkpoint.restore(self.cpmanager.latest_checkpoint)
             print("(NONE)Latest model chkp path is : {} setupWriter...".format(self.cpmanager.latest_checkpoint))
             #etl.set_dir(self.tblogs)
-            self.setupWriter()
+            self.setup_writer()
             return status
         else:
             status = self.checkpoint.restore(path)
             print("Latest model chkp path is : {}  setupWriter".format(status))
             #etl.set_dir(self.tblogs)
-            self.setupWriter()
+            self.setup_writer()
             return status
 
     def write_config(self, variables, code):

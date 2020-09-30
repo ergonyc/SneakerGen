@@ -627,9 +627,9 @@ class CVAE_EF(tf.keras.Model):
         self.enc_model.load_weights(os.path.join(dir_path, "enc_epoch_{}.h5".format(epoch)))
         self.gen_model.load_weights(os.path.join(dir_path, "dec_epoch_{}.h5".format(epoch)))
 
-    def restoreLatestMyModel(self, dir_path):
-        latest = tf.train.latest_checkpoint(dir_path)
-        self.model.load_weights(latest)
+    # def restoreLatestMyModel(self, dir_path):
+    #     latest = tf.train.latest_checkpoint(dir_path)
+    #     self.model.load_weights(latest)
 
 
 # %%

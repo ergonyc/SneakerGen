@@ -324,7 +324,7 @@ testlabs = labels # np.stack(labels)
 testimgs = np.concatenate(imgs,axis=0)
 print('Epoch Time: {:.2f}'.format( float(time.time() - start_time)))
 
-ut.dumpPickle(os.path.join(lg.saved_data,"test.pkl"), (testimgs,testlabs) )
+ut.dump_pickle(os.path.join(lg.saved_data,"test.pkl"), (testimgs,testlabs) )
 #%% log Config...
 lg.writeConfig(locals(), [cv.CVAE, cv.CVAE.__init__])
 lg.updatePlotDir()
@@ -379,7 +379,7 @@ for sample_index in range(10):
 ###########################
 #%% 
 
-# ut.makeGifFromDir(gif_in_dir, name):
+# ut.make_gif_from_dir(gif_in_dir, name):
 
 # model.save_model(lg.root_dir, 138)
 # #%% 

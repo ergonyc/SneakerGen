@@ -54,7 +54,7 @@ cf_padding_type = "post"
 cf_oov_tok = "<OOV>"
 cf_limits = [cf_img_size, cf_img_size]
 
-dfmeta = ut.readMeta()
+dfmeta = ut.read_meta()
 
 
 img_run_id = "0907-0217"   # last full image training runs cf_img_size =  192
@@ -97,7 +97,7 @@ cf_img_size = 224  #should this just read from config... or from a config loaded
 cf_kl_weight = 1
 
 
-snk2vec = ut.loadPickle(os.path.join(cf.IMG_RUN_DIR, img_run_id, "snk2vec.pkl"))
+snk2vec = ut.load_pickle(os.path.join(cf.IMG_RUN_DIR, img_run_id, "snk2vec.pkl"))
 
 # infile = open(os.path.join(cf.SHAPE_RUN_DIR, img_run_id, "snk2vec.pkl"),'rb')
 # snk2vec = pickle.load(infile)
