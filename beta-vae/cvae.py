@@ -207,6 +207,10 @@ class CVAE(tf.keras.Model):
         return tf.math.reduce_sum(-0.5 * ((sample - mean) ** 2.0 * tf.math.exp(-logvar) + logvar + log2pi), axis=raxis)
 
     def compute_test_loss(self, x):
+        """
+        TODO: change to compute_test_cost
+            this is actually "cost" not loss since its across the batch...
+        """
         temp_training = self.training
         self.training = False
         mean, logvar = self.encode(x)
@@ -219,60 +223,63 @@ class CVAE(tf.keras.Model):
         logqz_x = self.log_normal_pdf(z, mean, logvar)
 
         kl_divergence = logqz_x - logpz
-        neg_log_likelihood = logpx_z
+        neg_log_likelihood = -logpx_z
 
-        #test_loss = -tf.reduce_mean(logpx_z + logpz - logqz_x)
-        #return test_loss
         elbo = tf.math.reduce_mean(-self.kl_weight * kl_divergence - neg_log_likelihood)  # shape=()
         self.training = temp_training
         return -elbo
 
     @tf.function
     def compute_loss(self, x):
-        # this is averaged over the batche... os is technically a "COST" rather than loss
-        mean, logvar = self.encode(x)
-        z = self.reparameterize(mean, logvar)
-        x_logit = self.decode(z)
+        """
+        TODO: change to compute_test_cost
+            this is actually "cost" not loss since its across the batch...
+        """
+        mu, logvar = self.encode(x)
+        z = self.reparameterize(mu, logvar)
+        x_recons_logits = self.decode(z)
 
-        cross_ent = tf.nn.sigmoid_cross_entropy_with_logits(logits=x_logit, labels=x)
+        cross_ent = tf.nn.sigmoid_cross_entropy_with_logits(logits=x_recons_logits, labels=x)
         logpx_z = -tf.reduce_sum(cross_ent, axis=[1, 2, 3])  # JAH removed 3D axis=[1, 2, 3,4]
 
         logpz = self.log_normal_pdf(z, 0.0, 0.0)
-        logqz_x = self.log_normal_pdf(z, mean, logvar)
+        logqz_x = self.log_normal_pdf(z, mu, logvar)
         kl_divergence = logqz_x - logpz
-        neg_log_likelihood = logpx_z
+
+        neg_log_likelihood = -logpx_z
         #return -tf.reduce_mean(logpx_z + logpz - logqz_x)
-        elbo = tf.math.reduce_mean(-self.kl_weight * kl_divergence - neg_log_likelihood)  # shape=()
+        elbo = tf.math.reduce_mean(-self.kl_weight*kl_divergence - neg_log_likelihood)  # shape=()
         return -elbo
 
-    # vae cost function as negative ELBO
-    @tf.function
-    def vae_cost(self, x_true):
-        mu, logvar = self.encode(x_true)
-        z_sample = self.reparameterize(mu,logvar)
-        x_recons_logits = self.decode(z_sample)
-        # compute cross entropy loss for each dimension of every datapoint
-        raw_cross_entropy = tf.nn.sigmoid_cross_entropy_with_logits(labels=x_true,
-                            logits=x_recons_logits)  #
-        # compute cross entropy loss for all instances in mini-batch; shape=(batch_size,)
-        neg_log_likelihood = tf.math.reduce_sum(raw_cross_entropy, axis=[1, 2, 3])
-        # through MC approximation with one sample
+    # # vae cost function as negative ELBO
+    # @tf.function
+    # def vae_cost(self, x_true):
+    #     mu, logvar = self.encode(x_true)
+    #     z_sample = self.reparameterize(mu,logvar)
+    #     x_recons_logits = self.decode(z_sample)
+    #     # compute cross entropy loss for each dimension of every datapoint
+    #     raw_cross_entropy = tf.nn.sigmoid_cross_entropy_with_logits(labels=x_true,
+    #                         logits=x_recons_logits)  #
+    #     # compute cross entropy loss for all instances in mini-batch; shape=(batch_size,)
+    #     neg_log_likelihood = tf.math.reduce_sum(raw_cross_entropy, axis=[1, 2, 3])
+    #     # through MC approximation with one sample
     
-        # logpz = normal_log_pdf(z_sample, 0., 1.)  # shape=(batch_size,)
-        # logqz_x = normal_log_pdf(z_sample, mu, tf.math.square(sd))  # shape=(batch_size,)
-        logpz = self.log_normal_pdf(z_sample, 0., 0.)  # shape=(batch_size,)
-        logqz_x = self.log_normal_pdf(z_sample, mu, logvar)  # shape=(batch_size,)
-        kl_divergence = logqz_x - logpz
+    #     # logpz = normal_log_pdf(z_sample, 0., 1.)  # shape=(batch_size,)
+    #     # logqz_x = normal_log_pdf(z_sample, mu, tf.math.square(sd))  # shape=(batch_size,)
+    #     logpz = self.log_normal_pdf(z_sample, 0., 0.)  # shape=(batch_size,)
+    #     logqz_x = self.log_normal_pdf(z_sample, mu, logvar)  # shape=(batch_size,)
+    #     kl_divergence = logqz_x - logpz
 
-        elbo = tf.math.reduce_mean(-self.kl_weight * kl_divergence - neg_log_likelihood)  # shape=()
-        return -elbo
+    #     elbo = tf.math.reduce_mean(-self.kl_weight * kl_divergence - neg_log_likelihood)  # shape=()
+    #     return -elbo
 
 
     @tf.function
     def trainStep(self, x):
         with tf.GradientTape() as tape:
             #loss = self.compute_loss(x)
-            cost_mini_batch = self.vae_cost(x)
+            #cost_mini_batch = self.vae_cost(x)
+            cost_mini_batch = self.compute_loss(x)
 
         gradients = tape.gradient(cost_mini_batch, self.trainable_variables)
         #gradients = tape.gradient(loss, self.trainable_variables)
@@ -280,20 +287,20 @@ class CVAE(tf.keras.Model):
         return cost_mini_batch # loss
 
 
-    def compileModels(self):
+    def compile_models(self):
         self.gen_model.compile(optimizer=self.optimizer)
         self.enc_model.compile(optimizer=self.optimizer)
 
     def setLR(self, learning_rate):
         self.optimizer = tf.keras.optimizers.Adam(learning_rate)
 
-    def printMSums(self):
+    def print_model_summary(self):
         print("Inference Net Summary:\n")
         self.enc_model.summary()
         print("\nGenerative Net Summary:\n")
         self.gen_model.summary()
 
-    def printIO(self):
+    def print_model_IO(self):
         print("\nInference Net Summary (input then output):")
         print(self.enc_model.input_shape)
         print(self.enc_model.output_shape)
@@ -301,11 +308,11 @@ class CVAE(tf.keras.Model):
         print(self.gen_model.input_shape)
         print(self.gen_model.output_shape)
 
-    def saveMyModel(self, dir_path, epoch):
+    def save_model(self, dir_path, epoch):
         self.enc_model.save_weights(os.path.join(dir_path, "enc_epoch_{}.h5".format(epoch)))
         self.gen_model.save_weights(os.path.join(dir_path, "dec_epoch_{}.h5".format(epoch)))
 
-    def loadMyModel(self, dir_path, epoch):
+    def load_model(self, dir_path, epoch):
         self.enc_model.load_weights(os.path.join(dir_path, "enc_epoch_{}.h5".format(epoch)))
         self.gen_model.load_weights(os.path.join(dir_path, "dec_epoch_{}.h5".format(epoch)))
 
@@ -585,20 +592,20 @@ class CVAE_EF(tf.keras.Model):
         self.optimizer.apply_gradients(zip(gradients, self.trainable_variables))
         return loss
 
-    def compileModels(self):
-        self.gen_model.compile(optimizer=self.optimizer)
-        self.enc_model.compile(optimizer=self.optimizer)
+    # def compile_models(self):
+    #     self.gen_model.compile(optimizer=self.optimizer)
+    #     self.enc_model.compile(optimizer=self.optimizer)
 
-    def setLR(self, learning_rate):
-        self.optimizer = tf.keras.optimizers.Adam(learning_rate)
+    # def setLR(self, learning_rate):
+    #     self.optimizer = tf.keras.optimizers.Adam(learning_rate)
 
-    def printMSums(self):
+    def print_model_summary(self):
         print("Inference Net Summary:\n")
         self.enc_model.summary()
         print("\nGenerative Net Summary:\n")
         self.gen_model.summary()
 
-    def printIO(self):
+    def print_model_IO(self):
         print("\nInference Net Summary (input then output):")
         print(self.enc_model.input_shape)
         print(self.enc_model.output_shape)
@@ -612,11 +619,11 @@ class CVAE_EF(tf.keras.Model):
     #     gen = tf.keras.utils.plot_model(model.gen_model, show_shapes=True, show_layer_names=True)
     #     return enc, gen
 
-    def saveMyModel(self, dir_path, epoch):
+    def save_model(self, dir_path, epoch):
         self.enc_model.save_weights(os.path.join(dir_path, "enc_epoch_{}.h5".format(epoch)))
         self.gen_model.save_weights(os.path.join(dir_path, "dec_epoch_{}.h5".format(epoch)))
 
-    def loadMyModel(self, dir_path, epoch):
+    def load_model(self, dir_path, epoch):
         self.enc_model.load_weights(os.path.join(dir_path, "enc_epoch_{}.h5".format(epoch)))
         self.gen_model.load_weights(os.path.join(dir_path, "dec_epoch_{}.h5".format(epoch)))
 

@@ -51,7 +51,7 @@ class logger:
         self.new_run = root_dir is None
         if self.new_run:
             self.root_dir = cf.IMG_RUN_DIR
-            self.root_dir = os.path.join(self.root_dir, ut.addTimeStamp())
+            self.root_dir = os.path.join(self.root_dir, ut.add_time_stamp())
         else:
             self.root_dir = root_dir
 
@@ -74,23 +74,23 @@ class logger:
         self.updatePlotDir()
         
 
-    def checkMakeDirs(self):
-        def makeDir(dirname):
+    def check_make_dirs(self):
+        def make_dir(dirname):
             if os.path.isdir(dirname):
                 return
             else:
                 os.mkdir(dirname)
 
-        makeDir(self.root_dir)
-        makeDir(ut.plot_out_dir)
-        makeDir(self.model_saves)
-        makeDir(self.tblogs)
-        makeDir(self.saved_data)
+        make_dir(self.root_dir)
+        make_dir(ut.plot_out_dir)
+        make_dir(self.model_saves)
+        make_dir(self.tblogs)
+        make_dir(self.saved_data)
         #print(f"made {self.saved_data}")
         self.setupWriter()
 
 
-    def setupWriter(self):
+    def setup_writer(self):
         ##  need to make tensorflow logs
         if self.test_writer is None:
             train_log_dir = self.tblogs + '/train'
@@ -105,8 +105,8 @@ class logger:
     def reset(self, total_epochs=1):
         self.total_epochs = total_epochs
 
-    def logMetric(self, metric, name, test=False):
-        self.checkMakeDirs()
+    def log_metric(self, metric, name, test=False):
+        self.check_make_dirs()
         if test:
             summary_writer = self.test_writer
         else:
@@ -117,27 +117,27 @@ class logger:
     
             # tb_callback = tf.keras.callbacks.TensorBoard(LOG_DIR)
         # tb_callback.set_model(model)
-    def incrementEpoch(self):
+    def increment_epoch(self):
         self.total_epochs = self.total_epochs + 1
 
-    def setupCP(self, generator, encoder, opt):
+    def setup_checkpoint(self, generator, encoder, opt):
         if encoder is None:
             self.checkpoint = tf.train.Checkpoint(optimizer=opt, generator=generator)
         else:
             self.checkpoint = tf.train.Checkpoint(optimizer=opt, generator=generator, encoder=encoder)
 
         self.cpmanager = tf.train.CheckpointManager(
-            self.checkpoint, directory=self.model_saves, max_to_keep=(3 if (self.remote) else 999)
+            self.checkpoint, directory=self.model_saves, max_to_keep=(3 if (self.remote) else 20)
         )
         # AH add for better tensorboard??
         # tb_callback = tf.keras.callbacks.TensorBoard(LOG_DIR)
         # tb_callback.set_model(model)        # tb_callback = tf.keras.callbacks.TensorBoard(LOG_DIR)
         # tb_callback.set_model(model)
 
-    def cpSave(self):
+    def save_checkpoint(self):
         self.cpmanager.save()
 
-    def restoreCP(self, path=None):
+    def restore_checkpoint(self, path=None):
         if not os.path.isdir(self.root_dir):
             print(f"folder ({self.root_dir}) not found, not restored.")
             return
@@ -154,8 +154,8 @@ class logger:
             self.setupWriter()
             return status
 
-    def writeConfig(self, variables, code):
-        self.checkMakeDirs()
+    def write_config(self, variables, code):
+        self.check_make_dirs()
         if not self.training:
             print("Cannot, in read only mode.")
             return

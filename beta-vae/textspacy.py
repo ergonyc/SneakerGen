@@ -49,7 +49,7 @@ class TextSpacy(tf.keras.Model):
                 weights=[spacy_embeddings],
             )
         )
-        model.add(SpatialDropout1D(self.dropoutRate))sudo apt install gnome-tweak-tool
+        model.add(SpatialDropout1D(self.dropoutRate))
         model.add(Bidirectional(LSTM(64, return_sequences=True, kernel_regularizer=regularizers.l2(0.001))))
         model.add(Dropout(self.dropoutRate))
         model.add(Bidirectional(LSTM(128, return_sequences=True, kernel_regularizer=regularizers.l2(0.001))))
@@ -110,25 +110,22 @@ class TextSpacy(tf.keras.Model):
         return loss
         # return {m.name: m.result() for m in self.metrics}
 
-    def saveMyModel(self, dir_path, epoch):
+    def save_model(self, dir_path, epoch):
         self.model.save_weights(os.path.join(dir_path, "epoch_{}.h5".format(epoch)))
 
-    def loadMyModel(self, dir_path, epoch):
+    def load_model(self, dir_path, epoch):
         self.model.load_weights(os.path.join(dir_path, "epoch_{}.h5".format(epoch)))
 
-    def restoreLatestMyModel(self, dir_path):
+    def restore_latest_model(self, dir_path):
         latest = tf.train.latest_checkpoint(dir_path)
         print(f"restored this model: {latest}")
         self.model.load_weights(latest)
 
-    def setLR(self, learning_rate):
-        self.optimizer = tf.keras.optimizers.Adam(learning_rate)
-
-    def printMSums(self):
+    def print_model_summary(self):
         print("Text Embed Net Summary:\n")
         self.model.summary()
 
-    def printIO(self):
+    def print_model_IO(self):
         print("\nText Embed Net Summary (input then output):")
         print(self.model.input_shape)
         print(self.model.output_shape)
@@ -140,25 +137,3 @@ class TextSpacy(tf.keras.Model):
                 )
             )
 
-
-# %%  Consolodate data files
-
-# data IDs  (hash + Database)  i.e.  (goat,75d9be084d) or full file path of image (which contains both...)
-# Descriptions
-# Images
-# metadata :  Img size, latent size, train/test labels
-
-## COMPUTED
-# Latent vector (128-dim)
-# UMAP
-# tSNE
-
-
-## links  x2y ID+
-# Snkr2vec
-# id2desc
-# data table - ID, filename, database-code,  latent vector, description, loss, log_loss
-#
-# METADATA- BRAND+Qestimated, Price+Qestimated, category+Qestimated, neighbors(inDB), zappos-cat (Sneak, shoe, boot, slipper )
-#
-# META2 (non symmetry/augmented image qualities)- black, pair, zap

@@ -88,7 +88,7 @@ def interp(vec1, vec2, divs=5, include_ends=True):
     return np.stack(out)
 
 
-def superSample(list_to_sample, samples):
+def super_sample(list_to_sample, samples):
     """
     Samples from a list. If requested number of samples exceeds the length of the list, it repeats.
 
@@ -114,63 +114,32 @@ def superSample(list_to_sample, samples):
 
 
 #%% Data methods
-def dumpPickle(filepath, item_to_save):
+def dump_pickle(filepath, item_to_save):
     f = open(filepath, "wb")
     pickle.dump(item_to_save, f)
     f.close()
 
 
-def loadPickle(filepath):
+def load_pickle(filepath):
     infile = open(filepath, "rb")
     item = pickle.load(infile)
     infile.close()
     return item
 
 
-def addTimeStamp(path=""):
+def add_time_stamp(path=""):
     os.environ["TZ"] = "US/Pacific"
     time.tzset()
     return path + time.strftime("%m%d-%H%M")
 
 
-def getSubDirs(a_dir):
+def get_sub_dirs(a_dir):
     return [name for name in os.listdir(a_dir) if os.path.isdir(os.path.join(a_dir, name))]
 
 
-# def getMixedFPs(vox_in_dir, num_models_load, cat_prefixes):
-#     vox_fps = os.listdir(vox_in_dir)
-#     cat_vox_fps = [
-#         [
-#             os.path.join(cat, directory, "models/model_normalized.solid.binvox")
-#             for directory in os.listdir(os.path.join(vox_in_dir, cat))
-#         ]
-#         for cat in cat_prefixes
-#     ]
-#     cat_vox_fps = [superSample(cat, int(num_models_load / len(cat_prefixes))) for cat in cat_vox_fps]
-
-#     vox_fps = []
-#     for cat_list in cat_vox_fps:
-#         vox_fps.extend(cat_list)
-#     return vox_fps
-
 
 ##############################################
 ##############################################
-
-
-##############################################
-##############################################
-# all_voxs, all_mids = ut.loadData(cf_vox_size, cf_max_loads_per_cat, lg.vox_in_dir, cf_cat_prefixes)
-CLASS_NAMES = ["goat", "sns"]
-
-
-# def get_label(file_path):
-#     # convert the path to a list of path components
-#     parts = tf.strings.split(file_path, os.path.sep)
-#     # The second to last is the class-directory
-#     # out=parts.one_hot(CLASS_NAMES, 3)
-#     return parts[-2] == CLASS_NAMES
-
 
 def parse_function(filename, label):
     image_string = tf.read_file(filename)
@@ -211,15 +180,9 @@ def zoom_in(image, zoomf, pad_value=1.0):
 def load_and_convert(filename):
     image_string = tf.io.read_file(filename)
     im = tf.image.decode_jpeg(image_string, channels=3)
-    # image = tf.image.decode_jpeg(image_string, channels=3)
-    # label = tf.constant(-1, tf.int32)
-    # return image, label
-    # return tf.cast(im, tf.float32) / 255.0, tf.constant(-1, tf.int32)
-    # label = tf.constant(filename, tf.string)
+
     label = filename
     return tf.cast(im, tf.float32) / 255.0, label
-
-    # image = tf.image.convert_image_dtype(image, tf.float32)  # Cast and normalize the image to [0,1]
 
 
 def load_square_and_augment(filename, img_size=64):
@@ -227,31 +190,16 @@ def load_square_and_augment(filename, img_size=64):
     # ZOOMS between 100 and 110
     # random flip..
     zoomf = tf.random.uniform(shape=[1], minval=100, maxval=110)
-    print(f"zoomfactor = {zoomf[0]}")
-    print(f"zoomfactor(cast) = {tf.cast(zoomf[0], tf.float32)}")
-
     pad_value = 1.0
     image, label = load_and_convert(filename)
-    # image_string=tf.io.read_file(filename)
-    # image=tf.image.decode_jpeg(image_string,channels=3)
-    # image = tf.image.convert_image_dtype(image, tf.float32)
 
     shape_f = tf.cast(tf.shape(image), tf.float32)
-    print(f"shape = {shape_f}, len = {len(shape_f)}")
     shape_f = tf.cast(tf.shape(image), tf.float32)
     if len(shape_f) > 3:
         initial_height, initial_width = shape_f[1], shape_f[2]
-        print("already expanded")
     else:
         initial_height, initial_width = shape_f[0], shape_f[1]
         image = tf.expand_dims(image, 0)
-        print("expanding")
-    print(f"height = {initial_height},w = {initial_width}")
-
-    # x1 = 0.0  # - 0.025 * (initial_width - 1)
-    # x2 = 1.0  # + 0.025 * (initial_width - 1)
-    # y1 = 0.0 - 0.5 * (initial_width - initial_height) / initial_width
-    # y2 = 1.0 + 0.5 * (initial_width - initial_height) / initial_width
 
     delta_y = (initial_width - initial_height) / initial_width
     delta_z = zoomf - 1.0
@@ -262,10 +210,6 @@ def load_square_and_augment(filename, img_size=64):
     y1 = 0.5 * (-delta_y - delta_z)
     y2 = 1 + 0.5 * (delta_y + delta_z)
 
-    # x1 = 0.0  # - 0.025 * (initial_width - 1)
-    # x2 = 1.0  # + 0.025 * (initial_width - 1)
-    # y1 = 0.0 - 0.5 * (initial_width - initial_height) / initial_width
-    # y2 = 1.0 + 0.5 * (initial_width - initial_height) / initial_width
     delta_y = 0.5 * (initial_width - initial_height) / initial_width
 
     x1 = 0.0  # - 0.025 * (initial_width - 1)
@@ -273,7 +217,6 @@ def load_square_and_augment(filename, img_size=64):
     y1 = 0.0 - delta_y
     y2 = 1.0 + delta_y
 
-    # box = [0.0 - delta_y, 0.0, 1.0 + delta_y, 1.0]
     box = [y1, x1, y2, x2]
 
     image = tf.image.crop_and_resize(
@@ -300,9 +243,6 @@ def load_square_and_augment(filename, img_size=64):
 def load_and_square(filename, img_size=64):
     pad_value = 1.0
     image, label = load_and_convert(filename)
-    # image_string = tf.io.read_file(filename)
-    # image = tf.image.decode_jpeg(image_string, channels=3)
-    # image = tf.image.convert_image_dtype(image, tf.float32)
 
     shape_f = tf.cast(tf.shape(image), tf.float32)
     print(f"shape = {shape_f}, len = {len(shape_f)}")
@@ -315,10 +255,6 @@ def load_and_square(filename, img_size=64):
         print("expand now... squeeze later")
     print(f"height = {initial_height},w = {initial_width}")
 
-    # x1 = 0.0  # - 0.025 * (initial_width - 1)
-    # x2 = 1.0  # + 0.025 * (initial_width - 1)
-    # y1 = 0.0 - 0.5 * (initial_width - initial_height) / initial_width
-    # y2 = 1.0 + 0.5 * (initial_width - initial_height) / initial_width
     delta_y = (initial_width - initial_height) / initial_width
 
     x1 = 0.0  # - 0.025 * (initial_width - 1)
@@ -348,7 +284,7 @@ def load_and_square(filename, img_size=64):
 
 
 # all_voxs, all_mids = ut.loadData(cf_img_size, cf_max_loads_per_cat, lg.vox_in_dir, cf_cat_prefixes)
-def loadData(target_size, files):
+def load_data(target_size, files):
     """[summary]
 
     Args:
@@ -363,7 +299,7 @@ def loadData(target_size, files):
     return ds
 
 
-def loadAndPrepData(target_size, ds, augment=False):
+def load_and_prep_data(target_size, ds, augment=False):
     """[summary]
 
     Args:
@@ -397,7 +333,7 @@ def loadAndPrepData(target_size, ds, augment=False):
     return dataset  # , validate
 
 
-def loadAndPrepDataForTesting(target_size, input, cf_batch_size):
+def load_and_prep_for_testing(target_size, input, cf_batch_size):
     """[summary]
 
     Args:
@@ -435,7 +371,7 @@ def read_header(fp):
     return dims, translate, scale
 
 
-def getJSON(json_fp, df=False):
+def get_JSON(json_fp, df=False):
     if df:
         json_file = pd.read_json(json_fp)
     else:
@@ -444,53 +380,16 @@ def getJSON(json_fp, df=False):
     return json_file
 
 
-def readTax(tax_fn):
-    global tax
-    tax = pd.read_json(tax_fn)
-    tax["numc"] = tax.apply(lambda row: len(row.children), axis=1)
-    return tax
-
-
-def readMeta():
+def read_meta():
     global meta
     meta = pd.read_csv(cf.META_DATA_CSV)
     return meta
 
 
-def getMidCat(modelid):
-    global meta
-    if len(meta) < 2:
-        meta = readMeta()
-    return meta.cat[meta.mid == modelid].to_numpy()[0]
-
-
-def getCats(labels_tensor, cf_cat_prefixes):
-    output = ["0{}".format(getMidCat(item.numpy().decode())) for item in labels_tensor]
-    outcats = [
-        cf_cat_prefixes.index(item) if item in cf_cat_prefixes else len(cf_cat_prefixes) for item in output
-    ]
-    return tf.convert_to_tensor(outcats, dtype=tf.int32)
-
-
-def getCatName(catid):
-    global tax
-    if len(tax) == 0:
-        tax = readTax()
-    return tax.name[tax.synsetId == int(catid)].to_numpy()[0]
-
-
-def renameVoxs(vox_in_dir, prefix):
-    for i, file in enumerate(os.listdir(vox_in_dir)):
-        fullpath = os.path.join(vox_in_dir, file)
-        newpath = os.path.join(vox_in_dir, "{}_{:05d}.binvox".format(prefix, i))
-        print(fullpath, "\n", newpath, "\n")
-        os.rename(fullpath, newpath)
-
-
 #%% 3D Model Functions
 
 
-def showPic(modelid, title="", pic_in_dir=""):
+def show_pic(modelid, title="", pic_in_dir=""):
     if pic_in_dir == "":
         pic_in_dir = cf.RENDERS_DIR
     fullpath = os.path.join(pic_in_dir, modelid + ".png")
@@ -501,15 +400,15 @@ def showPic(modelid, title="", pic_in_dir=""):
     plt.show()
 
 
-def annoToMid(annoid):
+def anno_to_mID(annoid):
     return meta[meta.annoid == annoid].mid.values[0]
 
 
-def getMetric(original_voxs, generated_voxs):
+def get_metric(original_voxs, generated_voxs):
     return tf.reduce_mean(tf.keras.losses.mean_squared_error(original_voxs, generated_voxs)).numpy() * 1000
 
 
-def checkStopSignal(dir_path="/data/sn/all/"):
+def check_stop_signal(dir_path="/data/sn/all/"):
     stop_path = os.path.join(dir_path, "stop")
     go_path = os.path.join(dir_path, "go")
     if os.path.isdir(stop_path):
@@ -522,7 +421,7 @@ def checkStopSignal(dir_path="/data/sn/all/"):
 #%% Display Functions
 # Create gif from images in folder with bash and ImageMagick (replace XX with max number of images or just set high and error)
 # !convert -delay 15 -loop 0 *{000..XXX}.png car2truck.gif
-def makeGifFromDir(gif_in_dir, name):
+def make_gif_from_dir(gif_in_dir, name):
     """
     This handy method takes a directory as input that has the saved files from from matplotlib plots and renames them properly so they can be turned into a bouncing cyclic gif.
     Primarily used for creating the interpolation animations.
@@ -542,13 +441,6 @@ def makeGifFromDir(gif_in_dir, name):
     )
 
 
-# def plotMesh(verts, faces):
-#     fig = plt.figure()
-#     ax = fig.add_subplot(111, projection="3d")
-#     ax.plot_trisurf(verts[:, 0], verts[:, 1], faces, verts[:, 2], linewidth=0.2, antialiased=True)
-#     plt.show()
-
-
 def _padEnc(text, vocab):
     texts = text if type(text) == list else [text]
     lexs = [[vocab[t].rank for t in sent.replace(".", " . ").split(" ") if len(t) > 0] for sent in texts]
@@ -564,7 +456,7 @@ def _getImg(text, snkmodel, textmodel, nlp):
     return img, preds
 
 
-def plotImg(
+def plot_img(
     imgin, title="", stats=False, limits=None, show_axes=True, save_fig=False, show_fig=True, threshold=None
 ):
 
@@ -611,7 +503,7 @@ def plotImg(
     return
 
 
-def plotImgAndVect(
+def plot_img_and_vect(
     imgin,
     latent_vect,
     title="",
@@ -665,7 +557,7 @@ def plotImgAndVect(
     return
 
 
-def showReconstruct(
+def show_reconstruct(
     model, samples, index=0, title="", show_original=True, show_reconstruct=True, save_fig=False, limits=None
 ):
     predictions = model.reconstruct(samples[index][None, ...], training=False)
@@ -676,16 +568,16 @@ def showReconstruct(
         return
 
     if show_original:
-        plotImg(
+        plot_img(
             xvox, title="Original {}".format(title), stats=False, save_fig=save_fig, limits=limits,
         )
     if show_reconstruct:
-        plotImg(
+        plot_img(
             predictions, title="Reconstruct {}".format(title), stats=False, save_fig=save_fig, limits=limits,
         )
 
 
-def loadAndDump(target_size, input):
+def load_and_dump(target_size, input):
     """[summary]
 
     Args:
@@ -715,7 +607,7 @@ def loadAndDump(target_size, input):
     return ds  # , validate
 
 
-def dumpReconstruct(model, samples, test_samples):
+def dump_reconstruct(model, samples, test_samples):
     """[dumps the model encoding and lossess]
 
     Args:
@@ -746,23 +638,9 @@ def dumpReconstruct(model, samples, test_samples):
     return preds, losses
 
 
-def startStreamlit(filepath):
+def start_streamlit(filepath):
     subprocess.call("streamlit run {}".format(filepath), shell=True)
     subprocess.call("firefox new-tab http://localhost:8501/")
-
-
-# def exportBinvoxes(in_dir, out_dir, obj_prefix, vox_size):
-#     # Remove any .binvox files in directory
-#     subprocess.call("rm {}/*.binvox".format(in_dir), shell=True)
-#     # Create binvox files     In bash it's this:    for f in objs/{obj_prefix}*.obj; do file=${f%%.*}; ./binvox ${file}.obj -pb -d {vox_size};  done;
-#     subprocess.call(
-#         "for f in {}/{}*.obj; do file=${{f%%.*}}; ./binvox ${{file}}.obj -pb -d {};  done;".format(
-#             in_dir, obj_prefix, vox_size
-#         ),
-#         shell=True,
-#     )
-#     # Move binvox files to output dir
-#     subprocess.call("mv {}/*.binvox {}".format(in_dir, out_dir), shell=True)
 
 
 #%% For plotting meshes side by side
@@ -789,45 +667,3 @@ def tri_indices(simplices):
     # returns the lists of indices i, j, k
 
     return ([triplet[c] for triplet in simplices] for c in range(3))
-
-
-# def plotly_trisurf(x, y, z, simplices, colormap=cm.RdBu, plot_edges=None):
-#     """
-#     This function plots 3D meshes with plotly. It was copied from plotly documentation.
-#     """
-#     # x, y, z are lists of coordinates of the triangle vertices
-#     # simplices are the simplices that define the triangularization;
-#     # simplices is a numpy array of shape (no_triangles, 3)
-
-#     points3D = np.vstack((x, y, z)).T
-#     tri_vertices = list(map(lambda index: points3D[index], simplices))  # vertices of the surface triangles
-#     zmean = [np.mean(tri[:, 2]) for tri in tri_vertices]  # mean values of z-coordinates of triangle vertices
-#     min_zmean = np.min(zmean)
-#     max_zmean = np.max(zmean)
-#     facecolor = [map_z2color(zz, colormap, min_zmean, max_zmean) for zz in zmean]
-#     I, J, K = tri_indices(simplices)
-
-#     triangles = go.Mesh3d(x=x, y=y, z=z, facecolor=facecolor, i=I, j=J, k=K, name="")
-
-#     if plot_edges is None:  # the triangle sides are not plotted
-#         return [triangles]
-#     else:
-#         # define the lists Xe, Ye, Ze, of x, y, resp z coordinates of edge end points for each triangle
-#         # None separates data corresponding to two consecutive triangles
-#         Xe = []
-#         Ye = []
-#         Ze = []
-#         for T in tri_vertices:
-#             Xe.extend([T[k % 3][0] for k in range(4)] + [None])
-#             Ye.extend([T[k % 3][1] for k in range(4)] + [None])
-#             Ze.extend([T[k % 3][2] for k in range(4)] + [None])
-
-#         # define the lines to be plotted
-#         lines = go.Scatter3d(x=Xe, y=Ye, z=Ze, mode="lines", line=dict(color="rgb(70,70,70)", width=0.5))
-#         return [triangles, lines]
-
-
-# def plotlySurf(verts, faces):
-#     x, y, z = verts[:, 0], verts[:, 1], verts[:, 2]
-#     triangles, lines = plotly_trisurf(x, y, z, faces, colormap=cm.RdBu, plot_edges=True)
-#     return triangles, lines

@@ -72,6 +72,31 @@ cf_img_size = 192  #should this just read from config... or from a config loaded
 img_run_id = "0912-2052"   # last full image training runs cf_img_size =  256
 cf_img_size = 192  #should this just read from config... or from a config loaded in run_id
 
+img_run_id = "0923-1848"   # last full image training runs cf_img_size =  256
+cf_img_size = 224  #should this just read from config... or from a config loaded in run_id
+cf_kl_weight = 1
+
+img_run_id = "0927-2332"   # last full image training runs cf_img_size =  256
+cf_img_size = 224  #should this just read from config... or from a config loaded in run_id
+cf_kl_weight = 3
+
+img_run_id = "0928-1018"   # last full image training runs cf_img_size =  256
+cf_img_size = 224  #should this just read from config... or from a config loaded in run_id
+cf_kl_weight = 10
+
+img_run_id = "0928-1504"   # last full image training runs cf_img_size =  256
+cf_img_size = 224  #should this just read from config... or from a config loaded in run_id
+cf_kl_weight = 2
+
+img_run_id = "0929-0754"   # last full image training runs cf_img_size =  256
+cf_img_size = 224  #should this just read from config... or from a config loaded in run_id
+cf_kl_weight = 3
+
+img_run_id = "0929-1720"   # last full image training runs cf_img_size =  256
+cf_img_size = 224  #should this just read from config... or from a config loaded in run_id
+cf_kl_weight = 1
+
+
 snk2vec = ut.loadPickle(os.path.join(cf.IMG_RUN_DIR, img_run_id, "snk2vec.pkl"))
 
 # infile = open(os.path.join(cf.SHAPE_RUN_DIR, img_run_id, "snk2vec.pkl"),'rb')
@@ -170,7 +195,6 @@ num_samples = len(pnp)
 val_samples = int(cf_test_ratio * num_samples)
 train_samples = num_samples - val_samples
 
-# train_dataset, test_dataset = ut.loadAndPrepData(cf_vox_size, lg.vox_in_dir, cf_batch_size)
 
 #%% define splitShuffleData
 # we can get rid of this... we are not using in currently... just setting the seed for repeatability
@@ -248,7 +272,7 @@ for _ in train_ds:
     total_train_batchs += 1
 
 #%% Make model and print info
-def plotIO(model):
+def plot_IO(model):
     print("\n Net Summary (input then output):")
     return tf.keras.utils.plot_model(model, show_shapes=True, show_layer_names=True)
 
@@ -263,16 +287,15 @@ txtmodel = ts.TextSpacy(
 )
 #txtmodel = ts.TextSpacy(128, learning_rate=6e-4, max_length=cf_max_length, training=True)
 
-txtmodel.printMSums()
-txtmodel.printIO()
+txtmodel.print_model_summary()
+txtmodel.print_model_IO()
 
-# txtmodel.model.compile(optimizer="adam", run_eagerly=True,
-#     loss="mean_squared_error",metrics=['mse'])
+# txtmodel.model.compile(optimizer="adam",run_eagerly=True,loss="mean_squared_error",metrics=['mse'])
 txtmodel.model.compile(optimizer="adam", loss=tf.keras.losses.MeanSquaredError())
 
 loss_mean = tf.keras.metrics.Mean()
 
-plotIO(txtmodel.model)
+plot_IO(txtmodel.model)
 
 train_from_scratch = True
 
@@ -285,13 +308,12 @@ else:  # TODO:  making the model actually load is nescessary
     root_dir = os.path.join(cf.TXT_RUN_DIR, txt_run_id)
     lg = logger.logger(trainMode=True,root_dir=root_dir, txtMode=True)
     lg.reset(total_epochs=total_epochs)
-    #txtmodel.loadMyModel(lg.root_dir,total_epochs-1)
-    txtmodel.restoreLatestMyModel(lg.model_saves)
+    txtmodel.restore_latest_model(lg.model_saves)
 
 
-lg.setupCP(encoder=None, generator=txtmodel.model, opt=txtmodel.optimizer)
-lg.restoreCP()
-lg.checkMakeDirs()
+lg.setup_checkpoint(encoder=None, generator=txtmodel.model, opt=txtmodel.optimizer)
+lg.restore_checkpoint()
+lg.check_make_dirs()
 
 # #%% write config
 # lg.writeConfig(locals(), [cv.CVAE, cv.CVAE.__init__])
@@ -324,15 +346,8 @@ trainlabs = labels  # np.stack(labels)
 
 print("dump Time: {:.2f}".format(float(time.time() - start_time)))
 
-# path = os.path.join(cf.IMG_RUN_DIR, "saved_data","train")
-# #save training data
-# tf.data.experimental.save(
-#     train_dataset, path, compression=None, shard_func=None
-# )
-# need to force saved_data to get maid... probably in logger class..
 
-#ut.dumpPickle(os.path.join(cf.TXT_RUN_DIR, "saved_data", "train.pkl"), (trainimgs, trainlabs))
-ut.dumpPickle(os.path.join(lg.saved_data, "train.pkl"), (trainimgs, trainlabs))
+ut.dump_pickle(os.path.join(lg.saved_data, "train.pkl"), (trainimgs, trainlabs))
 
 
 #%% testing data save
@@ -356,12 +371,11 @@ flatten = lambda l: [item for sublist in l for item in sublist]
 testlabs = labels  # np.stack(labels)
 testimgs = imgs # np.stack(imgs)
 print("dump Time: {:.2f}".format(float(time.time() - start_time)))
-#ut.dumpPickle(os.path.join(cf.TXT_RUN_DIR, "saved_data", "test.pkl"), (testimgs, testlabs))
-ut.dumpPickle(os.path.join(lg.saved_data, "test.pkl"), (testimgs, testlabs))
+ut.dump_pickle(os.path.join(lg.saved_data, "test.pkl"), (testimgs, testlabs))
 
 #%% Method for training the model manually
 # TODO change names of internal loss collectors... they are not "ELBO"
-def trainModel(num_epochs, 
+def train_model(num_epochs, 
                 save_interval=10, 
                 test_interval=5,
                 current_losses=([],[])
@@ -386,13 +400,13 @@ def trainModel(num_epochs,
                 loss_mean(txtmodel.compute_loss(pred_y, validation_y))
 
             val_loss_epoch = loss_mean.result().numpy()
-            lg.logMetric(val_loss_epoch, "val loss")
+            lg.log_metric(val_loss_epoch, "val loss")
             loss_test.append(val_loss_epoch)
             print("TEST LOSS: {:.3f}".format(val_loss_epoch))
 
         if epoch % save_interval == 0:
             print(f"saving... epoch_n = {epoch}")
-            lg.cpSave()
+            lg.save_checkpoint()
 
         print(
             "Epoch: {:4d}  Loss: {:.3f}  Time: {:.2f}".format(
@@ -400,11 +414,11 @@ def trainModel(num_epochs,
             )
         )
 
-        lg.logMetric(loss_epoch, "train loss")
+        lg.log_metric(loss_epoch, "train loss")
         loss_train.append(loss_epoch)
-        lg.incrementEpoch()
+        lg.increment_epoch()
 
-        if (ut.checkStopSignal(dir_path=cf.TXT_RUN_DIR)) :
+        if (ut.check_stop_signal(dir_path=cf.TXT_RUN_DIR)) :
             print(f"stoping at epoch = {epoch}")
             break
         else:
@@ -416,7 +430,7 @@ def trainModel(num_epochs,
 
 
 #%% Train the model
-lg.writeConfig(locals(),[ts])  #this atually makes the directories...
+lg.write_config(locals(),[ts])  #this atually makes the directories...
 
 
 #%%
@@ -432,308 +446,19 @@ lg.writeConfig(locals(),[ts])  #this atually makes the directories...
 # else:
 #     print(f"sanity epoch={total_epochs}/l.epoch={lg.total_epochs}")
 
-# txtmodel.saveMyModel(lg.root_dir, lg.total_epochs )
+# txtmodel.save_model(lg.root_dir, lg.total_epochs )
 
 #%%
-n_epochs = 8000
+n_epochs = 2500
 total_epochs = 0
-epoch_n, curr_losses = trainModel(n_epochs, save_interval=20, test_interval=20,current_losses=([],[]))
+epoch_n, curr_losses = train_model(n_epochs, save_interval=20, test_interval=20,current_losses=([],[]))
 #epoch_n,elbo_train,elbo_test = trainModel(n_epochs, display_interval=5, save_interval=5, test_interval=5)
 total_epochs += epoch_n
 if lg.total_epochs == total_epochs:
     print(f"sanity epoch={total_epochs}")
 else:
     lg.reset(total_epochs=total_epochs)
-txtmodel.saveMyModel(lg.root_dir, lg.total_epochs )
+txtmodel.save_model(lg.root_dir, lg.total_epochs )
 
-#ut.dumpPickle(os.path.join(cf.TXT_RUN_DIR, "saved_data","losses.pkl"),curr_losses)
-ut.dumpPickle(os.path.join(lg.saved_data,"losses.pkl"),curr_losses)
+ut.dump_pickle(os.path.join(lg.saved_data,"losses.pkl"),curr_losses)
 
-#%%
-
-
-# #model.loadMyModel(lg.root_dir,total_epochs)
-# loss_batches_old = ut.loadPickle(os.path.join(cf.IMG_RUN_DIR, "saved_data","losses.pkl"))
-# ut.dumpPickle(os.path.join(cf.IMG_RUN_DIR, "saved_data","losses_old.pkl"), loss_batches_old )
-
-# n_epochs = 500/home/ergonyc/Projects/Project2.0/SnkrGen/beta-vae/txtruns/0908-0240
-# epoch_n, curr_losses = trainModel(n_epochs, save_interval=10, test_interval=10,current_losses=curr_losses)
-# total_epochs += epoch_n
-# if lg.total_epochs == total_epochs:
-#     print(f"sanity epoch={total_epochs}")
-# else:
-#     lg.reset(total_epochs=total_epochs)
-# txtmodel.saveMyModel(lg.root_dir, lg.total_epochs )
-
-# ut.dumpPickle(os.path.join(cf.IMG_RUN_DIR, "saved_data","losses.pkl"),curr_losses )
-
-#%%
-
-### TODO: I THINK WE HAVE THIS FILE AND ITS NOT CHANGING
-
-# #%% Generate a large set of sample descriptions to inform nearby descriptions on app
-# mid2desc = {}
-# for mid in tqdm(snk2vec.keys()):
-#     mid = mid.decode()
-#     indices = np.where(mnp == mid)[0]
-#     if len(indices) > 0:
-#         desc = dnp[rn.sample(list(indices), 1)][0]
-#         mid2desc[mid] = desc
-
-# file = open(os.path.join(cf.DATA_DIR, "mid2desc.pkl"), "wb")
-# pickle.dump(mid2desc, file)
-# file.close()
-
-#%%
-# total_epochs =  250
-# lg.reset(total_epochs=total_epochs)
-
-# if lg.total_epochs == total_epochs:
-#     print(f"sanity epoch={total_epochs}")
-# txtmodel.saveMyModel(lg.root_dir, lg.total_epochs )
-# #%% addd more iterations...
-# n_epochs = 2
-# #txtmodel.restoreLatestMyModel(lg.model_saves)
-# epoch_n = trainModel(n_epochs, save_interval=10, validate_interval=5)
-# total_epochs += epoch_n
-# if lg.total_epochs == total_epochs:
-#     print(f"sanity epoch={total_epochs}")
-# else:
-#     print(f"sanity epoch={total_epochs}/l.epoch={lg.total_epochs}")
-# txtmodel.saveMyModel(lg.root_dir, lg.total_epochs )
-
-# #%% addd more iterations...
-# n_epochs = 51
-# #%% Compare predicted and labeled vectors, useful sanity check on trained model
-# index = 1
-# for tx, tl in train_ds.take(1):restoreLatestMyModel
-#     tx = tf.cast(tx, dtype=tf.float32)
-
-# txtmodel.model.training = False
-# pred = txtmodel.sample(tx)
-# print("\nPredicted vector: \n", pred[index], "\n")
-# print("Label vector: \n", tl[index])
-# l = txtmodel.compute_loss(tl[index], pred[index]).numpy()
-# signs_eq = sum(np.sign(pred[index]) == np.sign(tl[index])) / pred[index].shape[0]
-# print(
-#     "\nStats for this comparison\n{:3d}  Loss: {:.3f}  Sum pred: {:.3f}  Sum lab: {:.3f}  Same Sign: {:.1f}%".format(
-#         index, l, np.sum(pred[index]), np.sum(tl[index]), 100 * signs_eq
-#     )
-# )
-
-# #%% Get test set loss
-# for tx, tl in train_ds.shuffle(100000).take(1000):
-#     pass
-# txtmodel.model.training = False
-# pred = txtmodel.sample(tx)
-# losses = np.mean(txtmodel.compute_loss(pred, tl))
-# print(losses)
-
-# #%% Load shape model
-# snkmodel = cv.CVAE(cf_latent_dim, cf_img_size)
-# snkmodel.printMSums()
-# snkmodel.printIO()
-
-# # img_run_id = "0828-2326"
-# # img_run_id = "0831-1253"   # last full image training runs cf_img_size =  224
-
-# #snkmodel.loadMyModel(lgImg.root_dir, 282)
-
-
-# root_dir = os.path.join(cf.IMG_RUN_DIR, img_run_id)
-# lgImg = logger.logger(root_dir=root_dir, trainMode=False)
-# lgImg.setupCP(encoder=snkmodel.enc_model, generator=snkmodel.gen_model, opt=snkmodel.optimizer)
-# lgImg.restoreCP()
-
-# #%% Method for going from text to image
-# def getImg(text):
-#     ptv = padEnc(text)
-#     preds = txtmodel.sample(ptv)
-#     img = snkmodel.sample(preds).numpy()[0, ..., 0]
-#     return img
-
-
-# #%% Test text2shape model
-# textlist = [
-#     "The jordan 1 is a crazy thing.  Nike gave it clean lines and i hi top. 1989 never looked so fresh.",
-#     "Yeezy boost is here.  For this drop the upper is dope, and chunky.",
-#     "another great puma clyde.  ",
-#     "dunk.  nike sb",
-#     "chuck taylor. express yourself.  classic canvas and rubber",
-#     "air max '95 ",
-# ]
-
-# # textlist = dnp[1:10]
-# for text in textlist:
-#     img = getImg(text)
-#     ut.plotImg(img, limits=cf_limits, title=text[0:4restoreLatestMyModel0])
-
-# #%% Test text2shape model
-# textlist = dnp[0:3]
-# for text in textlist:
-#     img = getImg(text)
-#     ut.plotImg(img, limits=cf_limits, title=text[0:60])
-
-
-# #%% Test text2shape model
-# textlist = dnp[1504:1509]
-# for text in textlist:
-#     img = getImg(text)
-#     ut.plotImg(img, limits=cf_limits, title=text[0:60])
-
-
-# #%%  restore model from runs
-# train_from_scratch = False
-
-# txt_run_id = "0829-2134"
-# root_dir = os.path.join(cf.TXT_RUN_DIR, txt_run_id)
-# # root_dir = lg.root_dir #
-# lg = logger.logger(root_dir=root_dir, txtMode=True,trainMode=False)
-
-# lg.setupCP(encoder=None, generator=txtmodel.model, opt=txtmodel.optimizer)
-
-# lg.restoreCP()
-
-# txtmodel.restoreLatestMyModel(lg.model_saves)
-# txtmodel.saveMyModel(lg.root_dir, 999)
-
-# # Load the previously saved weights
-# # txtmodel.load_weights(latest)
-
-# # Re-evaluate the model
-
-# #%% addd more iterations...
-
-# trainModel(10, save_interval=10, validate_interval=5)
-
-# #%%
-
-
-# txtmodel.loadMyModel(lg.root_dir, 483)
-# # Need to make methods to extract the pictures from test_dataset/train_dataset
-
-# #%% Train the model
-
-
-# #%% Compare predicted and labeled vectors, useful sanity check on trained model
-# index = 1
-# for tx, tl in train_ds.take(1):
-#     tx = tf.cast(tx, dtype=tf.float32)
-
-# txtmodel.model.training = False
-# pred = txtmodel.sample(tx)
-# print("\nPredicted vector: \n", pred[index], "\n")
-# print("Label vector: \n", tl[index])
-# l = txtmodel.compute_loss(tl[index], pred[index]).numpy()
-# signs_eq = sum(np.sign(pred[index]) == np.sign(tl[index])) / pred[index].shape[0]
-# print(
-#     "\nStats for this comparison\n{:3d}  Loss: {:.3f}  Sum pred: {:.3f}  Sum lab: {:.3f}  Same Sign: {:.1f}%".format(
-#         index, l, np.sum(pred[index]), np.sum(tl[index]), 100 * signs_eq
-#     )
-# )
-
-# #%% Get test set loss
-# for tx, tl in train_ds.shuffle(100000).take(1000):
-#     pass
-# txtmodel.model.training = False
-# pred = txtmodel.sample(tx)
-# losses = np.mean(txtmodel.compute_loss(pred, tl))
-# print(losses)
-
-# #%% Load shape model
-# snkmodel = cv.CVAE(cf_latent_dim, cf_img_size)
-# snkmodel.printMSums()
-# snkmodel.printIO()
-
-# img_run_id = "0828-2326"
-# img_run_id = "0907-0217"   # last full image training runs cf_img_size =  224
-
-# #snkmodel.loadMyModel(lgImg.root_dir, 282)
-
-
-# root_dir = os.path.join(cf.IMG_RUN_DIR, img_run_id)
-# lgImg = logger.logger(root_dir=root_dir, trainMode=False)
-# lgImg.setupCP(encoder=snkmodel.enc_model, generator=snkmodel.gen_model, opt=snkmodel.optimizer)
-# lgImg.restoreCP()
-
-# #%% Method for going from text to image
-# def getImg(text):
-#     ptv = padEnc(text)
-#     preds = txtmodel.sample(ptv)
-#     img = snkmodel.sample(preds).numpy()[0, ..., 0]
-#     return img
-
-
-# #%% Test text2shape model
-# textlist = [
-#     "The jordan 1 is a crazy thing.  Nike gave it clean lines and i hi top. 1989 never looked so fresh.",
-#     "Yeezy boost is here.  For this drop the upper is dope, and chunky.",
-#     "another great puma clyde.  ",
-#     "dunk.  nike sb",
-#     "chuck taylor. express yourself.  classic canvas and rubber",
-#     "air max '95 ",
-# ]
-
-# # textlist = dnp[1:10]
-# for text in textlist:
-#     img = getImg(text)
-#     ut.plotImg(img, limits=cf_limits, title=text[0:40])
-
-# #%% Test text2shape model
-# textlist = dnp[55:58]
-# for text in textlist:
-#     img = getImg(text)
-#     ut.plotImg(img, limits=cf_limits, title=text[0:60])
-
-
-# # #%% Test text2shape model
-# # textlist = dnp[1504:1509]
-# # for text in textlist:
-# #     img = getImg(text)
-# #     ut.plotImg(img, limits=cf_limits, title=text[0:60])
-
-
-# # #%% Run on single line of text
-# # text = "ceiling lamp that is very skinny and very tall. it has one head. it has a base. it has one chain."
-# # tensor = tf.constant(text)
-# # tbatch = tensor[None, ...]
-# # preds = txtmodel.model(tbatch)
-
-# # #%% Generate a large set of sample descriptions to inform nearby descriptions on app
-# # mid2desc = {}
-# # for mid in tqdm(snk2vec.keys()):
-# #     mid = mid.decode()
-# #     indices = np.where(mnp == mid)[0]
-# #     if len(indices) > 0:
-# #         desc = dnp[rn.sample(list(indices), 1)][0]
-# #         mid2desc[mid] = desc
-
-# # file = open(os.path.join(cf.DATA_DIR, "mid2desc.pkl"), "wb")
-# # pickle.dump(mid2desc, file)
-# # file.close()
-
-# # # %%of sample descriptions to show on streamlit app
-# # ex_descs = []
-# # for keyword in [
-# #     "Table",
-# #     "Chair",
-# #     "Lamp",
-# #     "Faucet",
-# #     "Clock",
-# #     "Bottle",
-# #     "Vase",
-# #     "Laptop",
-# #     "Bed",
-# #     "Mug",
-# #     "Bowl",
-# # ]:
-# #     for i in range(50):
-# #         desc = dnp[np.random.randint(0, len(dnp))]
-# #         while not keyword.lower() in desc:
-# #             desc = dnp[np.random.randint(0, len(dnp))]
-# #         ex_descs.append(desc)
-# #         print(desc)
-# # np.save(os.path.join(cf.DATA_DIR, "exdnp.npy"), np.array(ex_descs))
-
-
-# # %%
