@@ -208,8 +208,9 @@ class CVAE(tf.keras.Model):
 
     def compute_test_loss(self, x):
         """
-        TODO: change to compute_test_cost
-            this is actually "cost" not loss since its across the batch...
+        this is itentical to "compute_loss" function excep that training is turned off.
+        No gradients are saved and dropout is turned off.
+        NOTE: this is actually "cost" not loss since its across the batch...
         """
         temp_training = self.training
         self.training = False

@@ -10,7 +10,7 @@ import os
 
 LATENT_DIM = 128
 IMG_SIZE = 224  # 224, 256 (128)
-KL_WEIGHT = 10
+KL_WEIGHT = 1.0
 
 #CURR_IMGRUN_ID = '0930-2359'  
 CURR_IMGRUN_ID = None  #train from scratch

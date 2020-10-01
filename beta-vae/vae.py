@@ -62,14 +62,6 @@ tf.config.experimental.list_physical_devices('GPU')
 
 
 #%% Define Training methods
-def get_test_set_loss(dataset, batches=0) :
-    test_losses = []
-    for test_x, test_label in (dataset.take(batches).shuffle(100) if batches > 0 else dataset.shuffle(100)) :
-        #test_x = tf.cast(test_x, dtype=tf.float32) #might not need this
-        test_cost_batch = model.compute_test_loss(test_x)  # this should turn off the dropout...
-        test_losses.append(test_cost_batch)
-
-    return np.mean(test_losses)
 
 
 def train_model(epochs, display_interval=-1, save_interval=10, test_interval=10,current_losses=([],[])) :
@@ -89,7 +81,8 @@ def train_model(epochs, display_interval=-1, save_interval=10, test_interval=10,
         batch_index = 1
 
         # DO THE AUGMENTATION HERE...
-        for train_x, label in train_dataset :
+        for train_x, _ in train_dataset :
+        #for train_x, label in train_dataset :
             #train_x = tf.cast(train_x, dtype=tf.float32)
             loss_batch = model.trainStep(train_x)
             losses.append(loss_batch)
@@ -100,10 +93,7 @@ def train_model(epochs, display_interval=-1, save_interval=10, test_interval=10,
 
         ## TRAIN LOSS
         elbo = np.mean(losses)
-        print('Epoch: {}   Train loss: {:.1f}   Epoch Time: {:.2f}'.format(lg.total_epochs, 
-                            float(elbo),
-                            float(time.time() - start_time)) )
-
+        print(f'Epoch: {lg.total_epochs}   Train loss: {float(elbo):.1f}   Epoch Time: {float(time.time()-start_time):.2f}')
         lg.log_metric(elbo, 'train loss',test=False)
         elbo_train.append(elbo)
 
@@ -115,9 +105,14 @@ def train_model(epochs, display_interval=-1, save_interval=10, test_interval=10,
 
         ## TEST LOSSin chekmakedirs
         if epoch % test_interval == 0:
-            test_loss = get_test_set_loss(test_dataset, cf_batch_size)  # what should I do here??/ batch of 2???  shouldn't it be batch size??
-            print('   TEST LOSS  : {:.1f}    for epoch: {}'.format(test_loss, 
-                                                        lg.total_epochs))
+            test_losses = []
+            for test_x, test_label in test_dataset: # (dataset.take(batches).shuffle(100) if batches > 0 else dataset.shuffle(100)) :
+                #test_x = tf.cast(test_x, dtype=tf.float32) #might not need this
+                test_cost_batch = model.compute_test_loss(test_x)  # this should turn off the dropout...
+                test_losses.append(test_cost_batch)
+
+            test_loss = np.mean(test_losses)
+            print(f'   TEST LOSS  : {test_loss:.1f}    for epoch: {lg.total_epochs}')
             lg.log_metric(test_loss, 'test loss',test=True)
             elbo_test.append(test_loss)
 

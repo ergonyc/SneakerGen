@@ -350,7 +350,7 @@ def load_and_prep_for_testing(target_size, input, cf_batch_size):
     """
     files = input
 
-    ds = loadData(target_size, files)
+    ds = load_data(target_size, files)
     # just returns the files
     prep_and_augment = lambda x: load_square_and_augment(x, target_size)
 
