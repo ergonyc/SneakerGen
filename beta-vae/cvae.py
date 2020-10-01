@@ -307,6 +307,19 @@ class CVAE(tf.keras.Model):
         print("\nGenerative Net Summary:")
         print(self.gen_model.input_shape)
         print(self.gen_model.output_shape)
+        
+
+    def plot_model(self,encoder=True):
+        """
+        by default print teh encoder. print generator if False
+        """
+        if encoder:
+            print("\n Summary (encoder):")
+            return tf.keras.utils.plot_model(enc_model, show_shapes=True, show_layer_names=True)
+        else:
+            print("\n Summary (generator):")
+            return tf.keras.utils.plot_model(gen_model, show_shapes=True, show_layer_names=True)
+          
 
     def save_model(self, dir_path, epoch):
         self.enc_model.save_weights(os.path.join(dir_path, "enc_epoch_{}.h5".format(epoch)))

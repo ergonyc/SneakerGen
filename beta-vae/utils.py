@@ -158,10 +158,13 @@ def parse_function(filename, label):
 def zoom_in(image, zoomf, pad_value=1.0):
     # returns a square image the size of the inital width
     shape_f = tf.cast(tf.shape(image), tf.float32)
+        
     initial_height, initial_width = shape_f[0], shape_f[1]
-    if initial_height != initial_width:
-        print("WARNING:  the imput image should have been square!!!")
-        print(shape_f)
+    # if initial_height != initial_width:
+    #     print("WARNING:  the imput image should have been square!!!")
+    #     print(shape_f)
+    #     print(f"image.shape = {image.shape}")
+    #     print(f"image.shape_f = {image.shape_f}")
 
     x1 = 0 - (1 - zoomf) / 2.0  # * (initial_width - 1)
     x2 = 1 + (1 - zoomf) / 2.0  # * (initial_width - 1)
@@ -187,12 +190,12 @@ def load_and_convert(filename):
 
 
 def load_square_and_augment(filename, img_size=64):
-    pad_value = 1.0
+
+    image, label = load_and_convert(filename)
+
     # ZOOMS between 100 and 110
-    # random flip..
     zoomf = tf.random.uniform(shape=[1], minval=100, maxval=110)
     pad_value = 1.0
-    image, label = load_and_convert(filename)
 
     shape_f = tf.cast(tf.shape(image), tf.float32)
     shape_f = tf.cast(tf.shape(image), tf.float32)
@@ -230,9 +233,9 @@ def load_square_and_augment(filename, img_size=64):
         name=None,
     )
 
+    # random flip..
     if tf.random.uniform(()) > 0.5:
         # random mirroring
-        print("flipping  ")
         image = tf.image.flip_left_right(image)
 
     # label = tf.constant(-1, tf.int32)
@@ -246,15 +249,15 @@ def load_and_square(filename, img_size=64):
     image, label = load_and_convert(filename)
 
     shape_f = tf.cast(tf.shape(image), tf.float32)
-    print(f"shape = {shape_f}, len = {len(shape_f)}")
+    # print(f"shape = {shape_f}, len = {len(shape_f)}")
     shape_f = tf.cast(tf.shape(image), tf.float32)
     if len(shape_f) > 3:
         initial_height, initial_width = shape_f[1], shape_f[2]
     else:
         initial_height, initial_width = shape_f[0], shape_f[1]
         image = tf.expand_dims(image, 0)
-        print("expand now... squeeze later")
-    print(f"height = {initial_height},w = {initial_width}")
+    #     print("expand now... squeeze later")
+    # print(f"height = {initial_height},w = {initial_width}")
 
     delta_y = (initial_width - initial_height) / initial_width
 
@@ -356,20 +359,87 @@ def load_and_prep_for_testing(target_size, input, cf_batch_size):
     return batch1, batch2
 
 
-##############################################
-##############################################
-##############################################
+
+###############
+############
+
+def check_for_datafiles(data_directory,files):
+    
+    for f in files:
+        if os.path.exists(os.path.join(cf.DATA_DIR,f)):
+            have_files = True
+        else:
+            have_files = False
+            break
+
+    return have_files
+
+    #double check all our data exists
+#  
+def split_shuffle_data(files, test_split):
+    """[prepares the dataset by splitting into training and testing. 
+        presumably the random seed being set above will make it semi-
+        deterministic]
+
+    Args:
+        files ([type]): [list of images]
+        test_split ([type]): [description]
+
+    Returns:
+        [test_files,val_files,is_val]: [description]
+    """
+
+    for _ in range(100):  # shuffle 100 times
+       np.random.shuffle(files)
+
+    data_size = files.shape[0]
+    train_size = int((1.0 - test_split) * data_size)
+    ceil = lambda x: int(-(-x // 1))
+    val_size = ceil(test_split * data_size)
+
+    is_val = np.zeros(data_size,dtype=int)
+    is_val[train_size:]=1
+
+    train_data = files[0:train_size]
+    val_data = files[train_size:]
+
+    assert len(train_data) == train_size , "split wasn't clean (train)"
+    assert len(val_data) == val_size , "split wasn't clean (validate)"
+    #all_data = zip(files,is_val)
+    all_data = [list(z) for z in zip(files,is_val)]
+    return train_data, val_data, all_data
 
 
-def read_header(fp):
-    line = fp.readline().strip()
-    if not line.startswith(b"#binvox"):
-        raise IOError("Not a binvox file")
-    dims = list(map(int, fp.readline().strip().split(b" ")[1:]))
-    translate = list(map(float, fp.readline().strip().split(b" ")[1:]))
-    scale = list(map(float, fp.readline().strip().split(b" ")[1:]))[0]
-    line = fp.readline()
-    return dims, translate, scale
+
+
+def batch_data(ds,batch_size):
+    """[batches the dataset]
+
+    Args:
+        ds ([dataset]): [tensorflow dataset object]
+        batch_size ([int]): [size of our mini-batches]
+
+    Returns:
+        [test_files,val_files,is_val]: [description]
+    """
+    ds = ds.batch(batch_size, drop_remainder=False)  #this might mess stuff up....
+    dataset = ds.prefetch(AUTOTUNE)
+    return dataset
+
+
+def load_prep_and_batch_data(file_list, img_size,batch_size,augment=True):
+    """
+    datain is numpy array of files.... .decode to see it?
+    """
+
+    dataset = tf.data.Dataset.from_tensor_slices(file_list)
+    dataset = load_and_prep_data(img_size,  dataset, augment=augment)
+    dataset = batch_data(dataset,batch_size)
+    return dataset
+
+##############################################
+##############################################
+##############################################
 
 
 def get_JSON(json_fp, df=False):
@@ -593,7 +663,7 @@ def load_and_dump(target_size, input):
     else:  # type(input) == 'list'
         files = input
 
-    ds = loadData(target_size, files)
+    ds = load_data(target_size, files)
     # just returns the files
 
     # PREP

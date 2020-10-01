@@ -34,189 +34,54 @@ import utils as ut
 import logger
 import configs as cf
 
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
-import plotly.graph_objects as go
-from plotly.offline import plot
-import plotly.figure_factory as FF
-import plotly.express as px
-from sklearn.manifold import TSNE
-import seaborn as sns
 import tensorflow as tf
 
 AUTOTUNE = tf.data.experimental.AUTOTUNE
-VAL_FRAC = 20.0 / 100.0
 
+JUPYTER_NOTEBOOK = False
+
+# if JUPYTER_NOTEBOOK:
 # %reload_ext autoreload
 # %autoreload 2
 
 #%% Setup
-
-random.seed(488)
-tf.random.set_seed(488)
-
-### currently these are dummies until i can re-write the interpolation functions
-# TODO remove "categories" and fix the interpolatin tools
-cf_cat_prefixes = ut.cf_cat_prefixes = ['goat','sns']
-cf_num_classes = len(cf_cat_prefixes)
 #######
 cf_img_size = cf.IMG_SIZE
 cf_latent_dim = cf.LATENT_DIM
-cf_batch_size = 32
-cf_learning_rate = 4e-4
+cf_batch_size = cf.BATCH_SIZE #32
+cf_learning_rate = cf.IMGRUN_LR #4e-4
 cf_limits = [cf_img_size, cf_img_size]
 #( *-*) ( *-*)>⌐■-■ ( ⌐■-■)
 #
 cf_kl_weight = cf.KL_WEIGHT
-
-dfmeta = ut.read_meta()
-
-
+cf_num_epochs = cf.N_IMGRUN_EPOCH
+#dfmeta = ut.read_meta()
+cf_val_frac = cf.VALIDATION_FRAC
 #%%  are we GPU-ed?
 tf.config.experimental.list_physical_devices('GPU') 
 
 
-#%% model viz function
-# can i make this a model function??
-def plot_IO(model):
-    print("\n Net Summary (input then output):")
-    return tf.keras.utils.plot_model(model, show_shapes=True, show_layer_names=True)
-
-
-#%% Make model and print info
-model = cv.CVAE(cf_latent_dim, cf_img_size, learning_rate=cf_learning_rate, kl_weight=cf_kl_weight, training=True)
-### instance of model used in GOAT blog
-#model = cv.CVAE_EF(cf_latent_dim, cf_img_size, cf_learning_rate, training=True)
-
-#model.setLR(cf_learning_rate)
-model.print_model_summary()
-model.print_model_IO()
-plot_IO(model.enc_model)
-plot_IO(model.gen_model)
-
-#%% Setup logger info
-train_from_scratch = True
-if train_from_scratch :
-    lg = logger.logger(trainMode=True, txtMode=False)
-else :
-    shp_run_id = '0922-1614'  
-    root_dir = os.path.join(cf.IMG_RUN_DIR, shp_run_id)
-    lg = logger.logger(root_dir=root_dir, trainMode=True, txtMode=False)
-
-lg.setup_checkpoint(encoder=model.enc_model, generator=model.gen_model, opt=model.optimizer)
-lg.check_make_dirs()
-lg.restore_checkpoint() # actuall reads in the  weights...
-
-
-
-#%% define splitShuffleData
-
-def split_shuffle_data(files, test_split):
-    """[summary]
-
-    Args:
-        files ([type]): [description]
-        test_split ([type]): [description]
-
-    Returns:
-        [test_files,val_files,is_val]: [description]
-    """
-
-    for _ in range(100):  # shuffle 100 times
-       np.random.shuffle(files)
-
-    data_size = files.shape[0]
-    train_size = int((1.0 - test_split) * data_size)
-    ceil = lambda x: int(-(-x // 1))
-    val_size = ceil(test_split * data_size)
-
-    is_val = np.zeros(data_size,dtype=int)
-    is_val[train_size:]=1
-
-    train_data = files[0:train_size]
-    val_data = files[train_size:]
-
-    assert len(train_data) == train_size , "split wasn't clean (train)"
-    assert len(val_data) == val_size , "split wasn't clean (validate)"
-    #all_data = zip(files,is_val)
-    all_data = [list(z) for z in zip(files,is_val)]
-    return train_data, val_data, all_data
-
-
-#%% Set up the data..
-# TODO:  logical on does train_data exist... if not make it.. else just load
-
-img_in_dir = lg.img_in_dir
-#img_in_dir = "/Users/ergonyc/Projects/DATABASE/SnkrScrpr/data/"
-files = glob.glob(os.path.join(img_in_dir, "*/img/*"))
-#shuffle the dataset (GOAT+SNS)
-files = np.asarray(files)
-
-train_data, val_data, all_data = split_shuffle_data(files,VAL_FRAC)
-
-# # ## Save base train data to file  
-np.save(os.path.join(cf.DATA_DIR, 'train_data.npy'), train_data, allow_pickle=True)
-np.save(os.path.join(cf.DATA_DIR, 'val_data.npy'), val_data, allow_pickle=True)
-np.save(os.path.join(cf.DATA_DIR, 'all_data.npy'), all_data, allow_pickle=True)
-
-
-#%% Load base train data from finterval=5,curr_losses=curr_losses)
-train_dat = np.load(os.path.join(cf.DATA_DIR, 'train_data.npy'))
-val_dat = np.load(os.path.join(cf.DATA_DIR, 'val_data.npy'))
-all_dat = np.load(os.path.join(cf.DATA_DIR, 'all_data.npy'))
-
-
-
-#%% # LOAD & PREPROCESS the from list of filessudo apt install gnome-tweak-tool
-
-
-train_dataset = tf.data.Dataset.from_tensor_slices(train_dat)
-test_dataset = tf.data.Dataset.from_tensor_slices(val_dat)
-
-train_dataset = ut.load_and_prep_data(cf_img_size, train_dataset, augment=True)
-test_dataset = ut.load_and_prep_data(cf_img_size,  test_dataset, augment=False)
-
-def batch_and_prep_dataset(dataset):
-    dataset = dataset.batch(cf_batch_size, drop_remainder=False)  #this might mess stuff up....
-    dataset = dataset.prefetch(AUTOTUNE)
-    return dataset
-
-train_dataset = batch_and_prep_dataset(train_dataset)
-test_dataset = batch_and_prep_dataset(test_dataset)
-
-#%% Load all data
-# why do we need to do this??? to get a list of samples??
-for train_samples, train_labels in train_dataset.take(1) : pass
-for test_samples, test_labels in test_dataset.take(1) : pass
-
-
-#%% Load all data get number of batches... 
-
-total_train_batchs = 0
-for _ in train_dataset :
-    total_train_batchs += 1
-
-
-# #%% Setup datasets
-sample_index = 1
-
-#%% Training methods
+#%% Define Training methods
 def get_test_set_loss(dataset, batches=0) :
     test_losses = []
     for test_x, test_label in (dataset.take(batches).shuffle(100) if batches > 0 else dataset.shuffle(100)) :
         #test_x = tf.cast(test_x, dtype=tf.float32) #might not need this
-        #test_loss_batch = model.compute_loss(test_x)
-        #test_cost_batch = model.vae_cost(test_x)
         test_cost_batch = model.compute_test_loss(test_x)  # this should turn off the dropout...
-        
         test_losses.append(test_cost_batch)
+
     return np.mean(test_losses)
 
 
 def train_model(epochs, display_interval=-1, save_interval=10, test_interval=10,current_losses=([],[])) :
+    """
+    custom training loops to enable dumping images of the progress
+    """
     print('\n\nStarting training...\n')
     model.training=True
     elbo_test,elbo_train = current_losses
+    if len(elbo_test)>0:
+        print(f"test: n={len(elbo_test)}, last={elbo_test[-1]}")
+        print(f"train: n={len(elbo_train)}, last={elbo_train[-1]}")
 
     for epoch in range(1, epochs + 1):
         start_time = time.time()
@@ -260,10 +125,8 @@ def train_model(epochs, display_interval=-1, save_interval=10, test_interval=10,
         if epoch % save_interval == 0:
             lg.save_checkpoint()
 
-
         lg.increment_epoch()
-
-        if (ut.check_stop_signal(dir_path=cf.IMG_RUN_DIR)) :
+        if (ut.check_stop_signal(dir_path=cf.IMGRUN_DIR)) :
             print(f"stoping at epoch = {epoch}")
             break
         else:
@@ -273,72 +136,175 @@ def train_model(epochs, display_interval=-1, save_interval=10, test_interval=10,
     return epoch, out_losses #(loss_batch2,loss_batchN)
 
 
-#%% Training data save
-start_time = time.time()
-batch_index = 1
-imgs = []
-labels = []
 
-for train_x, label in train_dataset :
-    #train_x = tf.cast(train_x, dtype=tf.float32)
-    #imgs.append(np.moveaxis(train_x.numpy(),0,-1)) # put the "batch" at the end so we can stack
-    imgs.append(train_x.numpy()) # put the "batch" at the end so we can stack
-    labs = [l.numpy().decode() for l in label]# decode makes this a simple string??
-    labels.extend(labs)
-    stdout.write("\r[{:3d}/{:3d}]  ".format(batch_index, total_train_batchs))
-    stdout.flush()
-    batch_index = batch_index + 1
+#%% #################################################
+##
+##  LOAD/PREP data
+##         - l if we've already been through this for the current database we'll load... otherwise process.
+#####################################################
 
 
-trainimgs = np.concatenate(imgs,axis=0)
-trainlabs = labels # np.stack(labels)
-False
-print('Epoch Time: {:.2f}'.format( float(time.time() - start_time)))
 
-#path = os.path.join(cf.IMG_RUN_DIR, "saved_data","train")
-# #save training data
-# tf.data.experimental.save(
-#     train_dataset, path, compression=None, shard_func=None
-# )
-ut.dump_pickle(os.path.join(lg.saved_data,"train_agumented.pkl"), (trainimgs,trainlabs) )
+data_from_scratch = not ut.check_for_datafiles(cf.DATA_DIR,['train_data.npy','val_data.npy','all_data.npy'])
+#data_from_scratch = True
+random.seed(488)
+tf.random.set_seed(488)
+
+if data_from_scratch:
+    #create
+    files = glob.glob(os.path.join(cf.IMAGE_FILEPATH, "*/img/*"))
+    files = np.asarray(files)
+    train_data, val_data, all_data = ut.split_shuffle_data(files,cf_val_frac)
+    # Save base train data to file  
+    np.save(os.path.join(cf.DATA_DIR, 'train_data.npy'), train_data, allow_pickle=True)
+    np.save(os.path.join(cf.DATA_DIR, 'val_data.npy'), val_data, allow_pickle=True)
+    np.save(os.path.join(cf.DATA_DIR, 'all_data.npy'), all_data, allow_pickle=True)
+else:
+    #load
+    print(f"loading train/validate data from {cf.DATA_DIR}")
+    train_data = np.load(os.path.join(cf.DATA_DIR, 'train_data.npy'), allow_pickle=True)
+    val_data = np.load(os.path.join(cf.DATA_DIR, 'val_data.npy'), allow_pickle=True)
+    all_data = np.load(os.path.join(cf.DATA_DIR, 'all_data.npy'), allow_pickle=True)
 
 
-#%% validation data save 
-batch_index = 1
-imgs = []
-labels = []
-for test_x, label in test_dataset :
-    #train_x = tf.cast(train_x, dtype=tf.float32)
-    #imgs.append(np.moveaxis(train_x.numpy(),0,-1)) # put the "batch" at the end so we can stack
-    imgs.append(train_x.numpy()) # put the "batch" at the end so we can stack
-    labs =  [l.numpy().decode() for l in label] # decode makes this a simple string??
-    labels.extend(labs)
+#%% #################################################
+##
+##  Set up the model 
+##         - load current state or
+##         - train from scratch
+#####################################################
 
-    stdout.write("\r[{:3d}/{:3d}]  ".format(batch_index, 16))
-    stdout.flush()
-    batch_index = batch_index + 1
+model = cv.CVAE(cf_latent_dim, cf_img_size, learning_rate=cf_learning_rate, kl_weight=cf_kl_weight, training=True)
+### instance of model used in GOAT blog
+#model = cv.CVAE_EF(cf_latent_dim, cf_img_size, cf_learning_rate, training=True)
 
-flatten = lambda l: [item for sublist in l for item in sublist]
+model.print_model_summary()
+model.print_model_IO()
 
-testlabs = labels # np.stack(labels)
-testimgs = np.concatenate(imgs,axis=0)
-print('Epoch Time: {:.2f}'.format( float(time.time() - start_time)))
+if JUPYTER_NOTEBOOK:
+    tf.keras.utils.plot_model(model.enc_model, show_shapes=True, show_layer_names=True)
+    tf.keras.utils.plot_model(model.gen_model, show_shapes=True, show_layer_names=True)
 
-ut.dump_pickle(os.path.join(lg.saved_data,"test.pkl"), (testimgs,testlabs) )
-#%% log Config...
-lg.writeConfig(locals(), [cv.CVAE, cv.CVAE.__init__])
-lg.updatePlotDir()
-tf.config.experimental.list_physical_devices('GPU') 
 
-# copy to the current run train data to file
-np.save(os.path.join(lg.saved_data, 'train_data.npy'), train_data, allow_pickle=True)
-np.save(os.path.join(lg.saved_data, 'val_data.npy'), val_data, allow_pickle=True)
-np.save(os.path.join(lg.saved_data, 'all_data.npy'), all_data, allow_pickle=True)
+#%% Setup logger info
+train_from_scratch = ( cf.CURR_IMGRUN_ID is None )
+
+if train_from_scratch:
+    lg = logger.logger(trainMode=True, txtMode=False)
+    lg.setup_checkpoint(encoder=model.enc_model, generator=model.gen_model, opt=model.optimizer) # sets up the writer
+    #lg.restore_checkpoint() 
+    lg.check_make_dirs() # makes all the direcotries
+    # copy to the current run train data to file
+    np.save(os.path.join(lg.saved_data, 'train_data.npy'), train_data, allow_pickle=True)
+    np.save(os.path.join(lg.saved_data, 'val_data.npy'), val_data, allow_pickle=True)
+    np.save(os.path.join(lg.saved_data, 'all_data.npy'), all_data, allow_pickle=True)
+    total_epochs = 0
+    curr_losses = ([],[])
+else:
+    root_dir = os.path.join(cf.IMGRUN_DIR, cf.CURR_IMGRUN_ID)
+    lg = logger.logger(root_dir=root_dir, trainMode=True, txtMode=False)
+    lg.setup_checkpoint(encoder=model.enc_model, generator=model.gen_model, opt=model.optimizer) # sets up the writer
+    lg.restore_checkpoint() # actuall reads in the  weights...
+    allfiles = os.listdir(lg.saved_data)
+    print(f"allfiles: {allfiles}")
+    total_epochs = [int(f.rstrip(".pkl").lstrip("losses_")) for f in allfiles if f.startswith("losses_")]
+    total_epochs.sort(reverse=True)
+    print(f"total_epochs = {total_epochs[0]}")
+    total_epochs = total_epochs[0]
+    curr_losses = ut.load_pickle(os.path.join(lg.saved_data, f"losses_{total_epochs}.pkl"))
+
+
+
+#%% # LOAD & PREPROCESS the from list of filessudo apt install gnome-tweak-tool
+# could simplify this by making another "load_prep_batch_data(train_data,imagesize,augment=True,)"
+train_dataset = ut.load_prep_and_batch_data(train_data, cf_img_size, cf_batch_size, augment=True)
+test_dataset =  ut.load_prep_and_batch_data(  val_data, cf_img_size, cf_batch_size, augment=False)
+
+# train_dataset = tf.data.Dataset.from_tensor_slices(train_data)
+# test_dataset = tf.data.Dataset.from_tensor_slices(val_data)
+# train_dataset = ut.load_and_prep_data(cf_img_size, train_dataset, augment=True)
+# test_dataset = ut.load_and_prep_data(cf_img_size,  test_dataset, augment=False)
+# train_dataset = ut.batch_data(train_dataset)
+# test_dataset = ut.batch_data(test_dataset)
+
+#%% Load all data
+# get some samples
+for train_samples, train_labels in train_dataset.take(1) : pass
+for test_samples, test_labels in test_dataset.take(1) : pass
+
+# count number of batches... 
+total_train_batchs = 0
+for _ in train_dataset :
+    total_train_batchs += 1
+
+# #%% Setup datasets
+sample_index = 1
+
+#%% Training & Validation data save?
+# do we want to save the image data for the training set... i.e. the augmented bytes?
+dump_image_data = False
+if dump_image_data:
+
+    start_time = time.time()
+    batch_index = 1
+    imgs = []
+    labels = []
+
+    for train_x, label in train_dataset :
+        #train_x = tf.cast(train_x, dtype=tf.float32)
+        #imgs.append(np.moveaxis(train_x.numpy(),0,-1)) # put the "batch" at the end so we can stack
+        imgs.append(train_x.numpy()) # put the "batch" at the end so we can stack
+        labs = [l.numpy().decode() for l in label]# decode makes this a simple string??
+        labels.extend(labs)
+        stdout.write("\r[{:3d}/{:3d}]  ".format(batch_index, total_train_batchs))
+        stdout.flush()
+        batch_index = batch_index + 1
+
+    trainimgs = np.concatenate(imgs,axis=0)
+    trainlabs = labels # np.stack(labels)
+    False
+    print('Epoch Time: {:.2f}'.format( float(time.time() - start_time)))
+
+    ut.dump_pickle(os.path.join(lg.saved_data,"train_agumented.pkl"), (trainimgs,trainlabs) )
+
+    # validation data save 
+    batch_index = 1
+    imgs = []
+    labels = []
+    for test_x, label in test_dataset :
+        imgs.append(train_x.numpy()) # put the "batch" at the end so we can stack
+        labs =  [l.numpy().decode() for l in label] # decode makes this a simple string??
+        labels.extend(labs)
+
+        stdout.write("\r[{:3d}/{:3d}]  ".format(batch_index, 16))
+        stdout.flush()
+        batch_index = batch_index + 1
+
+    flatten = lambda l: [item for sublist in l for item in sublist]
+
+    testlabs = labels # np.stack(labels)
+    testimgs = np.concatenate(imgs,axis=0)
+    print('Epoch Time: {:.2f}'.format( float(time.time() - start_time)))
+
+    ut.dump_pickle(os.path.join(lg.saved_data,"test.pkl"), (testimgs,testlabs) )
+
 
 #%% 
-n_epochs = 300
-total_epochs = 0
-epoch_n, curr_losses = train_model(n_epochs, display_interval=5, save_interval=20, test_interval=5,current_losses=([],[]))
+# #################################################
+##
+##  log the run and TRAIN!!
+##    - train from scratch OR 
+##    - start where we left off
+##
+#####################################################
+# log Config...
+lg.write_config(locals(), [cv.CVAE, cv.CVAE.__init__])
+lg.update_plot_dir()
+#tf.config.experimental.list_physical_devices('GPU') 
+
+#%% 
+n_epochs = cf_num_epochs
+epoch_n, curr_losses = train_model(n_epochs, display_interval=5, save_interval=20, test_interval=5,current_losses=curr_losses)
 #epoch_n,elbo_train,elbo_test = trainModel(n_epochs, display_interval=5, save_interval=5, test_interval=5)
 total_epochs += epoch_n
 if lg.total_epochs == total_epochs:
@@ -347,14 +313,9 @@ else:
     lg.reset(total_epochs=total_epochs)
 model.save_model(lg.root_dir, lg.total_epochs )
 
-ut.dump_pickle(os.path.join(lg.saved_data, "losses.pkl"),curr_losses)
+ut.dump_pickle(os.path.join(lg.saved_data, f"losses_{total_epochs}.pkl"),curr_losses)
 
 
-
-#%%
-
-
-#%% 
 
 for test_samples, test_labels in test_dataset.take(1) : pass
 for train_samples, train_labels in train_dataset.take(1) : pass

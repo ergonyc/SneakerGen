@@ -14,7 +14,7 @@ This file is used to pipeline zappos data into the autoencoder
 3. dump new data files for the streamlit app
 
 '''
-#
+# Is it a simple as adding a "zappos" folder which links to the database?  caveat is no "descriptions"
 
 #%% Imports
 import numpy as np

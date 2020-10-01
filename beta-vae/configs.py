@@ -10,7 +10,21 @@ import os
 
 LATENT_DIM = 128
 IMG_SIZE = 224  # 224, 256 (128)
-KL_WEIGHT = 1
+KL_WEIGHT = 10
+
+#CURR_IMGRUN_ID = '0930-2359'  
+CURR_IMGRUN_ID = None  #train from scratch
+#CURR_TXTRUN_ID = '0922-1614'  
+CURR_TXTRUN_ID = None  #train from scratch
+N_IMGRUN_EPOCH = 400
+N_TXTRUN_EPOCH = 2200
+
+BATCH_SIZE = 32
+IMGRUN_LR = 4e-4
+TXTRUN_LR = 1e-4
+
+VALIDATION_FRAC = 20.0 / 100.0  # standard 80/20 test/validate split
+
 
 #%% Properties
 # This folder path should only exist on the remote machine
@@ -22,8 +36,8 @@ HOME = "/home/ergonyc"    #linux
 if REMOTE:  # Running on EC2 instance or similar
     META_DATA_CSV = "/data/sn/all/meta/dfmeta.csv"
     VOXEL_FILEPATH = "/data/sn/all/all/"
-    IMG_RUN_DIR = "/data/sn/all/runs/"
-    TXT_RUN_DIR = "/data/sn/all/txtruns/"
+    IMGRUN_DIR = "/data/sn/all/runs/"
+    TXTRUN_DIR = "/data/sn/all/txtruns/"
     DATA_DIR = "/data/sn/all/data/"
 
 else:  # Running locally
@@ -47,8 +61,8 @@ else:  # Running locally
     This is the location of the image data scraped from GOAT and SNS. 
     """
 
-    IMG_RUN_DIR = HOME + "/Projects/Project2.0/SnkrGen/beta-vae/imgruns/"
-    TXT_RUN_DIR = HOME + "/Projects/Project2.0/SnkrGen/beta-vae/txtruns/"
+    IMGRUN_DIR = HOME + "/Projects/Project2.0/SnkrGen/beta-vae/imgruns/"
+    TXTRUN_DIR = HOME + "/Projects/Project2.0/SnkrGen/beta-vae/txtruns/"
     """
     These are the run log and model checkpoint folders. This folder structure is generated and managed by the logger.py class.
 
