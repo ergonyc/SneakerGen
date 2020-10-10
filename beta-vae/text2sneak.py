@@ -61,20 +61,46 @@ cf_val_frac = cf.VALIDATION_FRAC
 tf.config.experimental.list_physical_devices('GPU') 
 
 
-img_run_id = "0929-2259"   # last full image training runs cf_img_size =  256
+img_run_id = "1001-1510"   # last full image training runs cf_img_size =  256
 cf_img_size = 224  #should this just read from config... or from a config loaded in run_id
-cf_kl_weight = 3
+cf_kl_weight = 1.
 
-img_run_id = "0930-0846"   # last full image training runs cf_img_size =  256
+img_run_id = "1001-2040"   # last full image training runs cf_img_size =  256
 cf_img_size = 224  #should this just read from config... or from a config loaded in run_id
-cf_kl_weight = 10
+cf_kl_weight = 0.5
 
-img_run_id = "0930-0846"   # last full image training runs cf_img_size =  256
+
+img_run_id = "1002-0844"   # last full image training runs cf_img_size =  256
 cf_img_size = 224  #should this just read from config... or from a config loaded in run_id
-cf_kl_weight = 1
+cf_kl_weight = 2.0
+
+img_run_id = "1002-1244"   # last full image training runs cf_img_size =  256
+cf_img_size = 224  #should this just read from config... or from a config loaded in run_id
+cf_kl_weight = 4.0
+
+img_run_id = "1002-1833"   # last full image training runs cf_img_size =  256
+cf_img_size = 224  #should this just read from config... or from a config loaded in run_id
+cf_kl_weight = 8.0
+
+img_run_id = "1002-2316"   # last full image training runs cf_img_size =  256
+cf_img_size = 224  #should this just read from config... or from a config loaded in run_id
+cf_kl_weight = 16.0
+
+img_run_id = "1003-1046"   # last full image training runs cf_img_size =  256
+cf_img_size = 224  #should this just read from config... or from a config loaded in run_id
+cf_kl_weight = 0.25
 
 
+img_run_id = "1004-1938"   # last full image training runs cf_img_size =  256
+cf_img_size = 224  #should this just read from config... or from a config loaded in run_id
+cf_kl_weight = 32.
 snk2vec = ut.load_pickle(os.path.join(cf.IMGRUN_DIR, img_run_id, "snk2vec.pkl"))
+
+
+img_run_id = "1007-1709"   # last full image training runs cf_img_size =  256
+cf_img_size = 224  #should this just read from config... or from a config loaded in run_id
+cf_kl_weight = 2.0  # with more cvae epichs... (overfitting)
+
 
 # infile = open(os.path.join(cf.SHAPE_RUN_DIR, img_run_id, "snk2vec.pkl"),'rb')
 # snk2vec = pickle.load(infile)
@@ -169,6 +195,8 @@ if data_from_scratch:
     np.save(os.path.join(cf.DATA_DIR, 'train_txt_data.npy'), train_data, allow_pickle=True)
     np.save(os.path.join(cf.DATA_DIR, 'val_txt_data.npy'), val_data, allow_pickle=True)
     np.save(os.path.join(cf.DATA_DIR, 'all_txt_data.npy'), all_data, allow_pickle=True)
+    # also save the vectors we are fitting to
+    
 else:
     #load
     print(f"loading train/validate data from {cf.DATA_DIR}")
@@ -309,6 +337,8 @@ if train_from_scratch:
     np.save(os.path.join(lg.saved_data, 'train_txt_data.npy'), train_data, allow_pickle=True)
     np.save(os.path.join(lg.saved_data, 'val_txt_data.npy'), val_data, allow_pickle=True)
     np.save(os.path.join(lg.saved_data, 'all_txt_data.npy'), all_data, allow_pickle=True)
+    ut.dump_pickle(os.path.join(lg.saved_data, "snk2vec.pkl"), snk2vec)
+
     total_epochs = 0
     curr_losses = ([],[])
 else:
