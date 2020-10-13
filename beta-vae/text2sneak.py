@@ -39,7 +39,7 @@ JUPYTER_NOTEBOOK = False
 
 
 #%% Filter out any data that is not present in shape2vec and stack it into np arrays
-
+# ANYTHING CF gets written into configs.csv
 #######
 cf_img_size = cf.IMG_SIZE # 128,192, 224, 256
 cf_latent_dim = cf.LATENT_DIM # 128
@@ -60,47 +60,61 @@ cf_val_frac = cf.VALIDATION_FRAC
 #%%  are we GPU-ed?
 tf.config.experimental.list_physical_devices('GPU') 
 
+#TODO: change the img_run_id & txt_run_id to cf_ so they will be logged
 
-img_run_id = "1001-1510"   # last full image training runs cf_img_size =  256
-cf_img_size = 224  #should this just read from config... or from a config loaded in run_id
+img_run_id = "1001-1510"   
+cf_img_size = 224  
 cf_kl_weight = 1.
+#txt_run_id = "1001-1830"  
 
-img_run_id = "1001-2040"   # last full image training runs cf_img_size =  256
-cf_img_size = 224  #should this just read from config... or from a config loaded in run_id
+
+img_run_id = "1001-2040"   
+cf_img_size = 224  
 cf_kl_weight = 0.5
+#txt_run_id = "1001-2155"  
 
 
-img_run_id = "1002-0844"   # last full image training runs cf_img_size =  256
-cf_img_size = 224  #should this just read from config... or from a config loaded in run_id
+img_run_id = "1002-0844"   
+cf_img_size = 224  
 cf_kl_weight = 2.0
+# 1002-0957
 
-img_run_id = "1002-1244"   # last full image training runs cf_img_size =  256
-cf_img_size = 224  #should this just read from config... or from a config loaded in run_id
+img_run_id = "1002-1244"   
+cf_img_size = 224  
 cf_kl_weight = 4.0
+# 1002-1634
 
-img_run_id = "1002-1833"   # last full image training runs cf_img_size =  256
-cf_img_size = 224  #should this just read from config... or from a config loaded in run_id
+img_run_id = "1002-1833"   
+cf_img_size = 224  
 cf_kl_weight = 8.0
+# 1002-2117 
 
-img_run_id = "1002-2316"   # last full image training runs cf_img_size =  256
-cf_img_size = 224  #should this just read from config... or from a config loaded in run_id
+img_run_id = "1002-2316"   
+cf_img_size = 224  
 cf_kl_weight = 16.0
+# 1003-0847 
 
-img_run_id = "1003-1046"   # last full image training runs cf_img_size =  256
-cf_img_size = 224  #should this just read from config... or from a config loaded in run_id
+img_run_id = "1003-1046"   
+cf_img_size = 224  
 cf_kl_weight = 0.25
+# 1003-1159 
 
 
-img_run_id = "1004-1938"   # last full image training runs cf_img_size =  256
-cf_img_size = 224  #should this just read from config... or from a config loaded in run_id
+img_run_id = "1004-1938"  
+cf_img_size = 224 
 cf_kl_weight = 32.
-snk2vec = ut.load_pickle(os.path.join(cf.IMGRUN_DIR, img_run_id, "snk2vec.pkl"))
+# 1004-2334 
+
+#img_run_id = "1005-1010" # txtmodel probably run with against 1004-1938 
+#cf_img_size = 224 
+#cf_kl_weight = 2.
+# 1005-2334 
 
 
-img_run_id = "1007-1709"   # last full image training runs cf_img_size =  256
-cf_img_size = 224  #should this just read from config... or from a config loaded in run_id
+img_run_id = "1007-1709"  
+cf_img_size = 224  
 cf_kl_weight = 2.0  # with more cvae epichs... (overfitting)
-
+# 1007-1858
 
 # infile = open(os.path.join(cf.SHAPE_RUN_DIR, img_run_id, "snk2vec.pkl"),'rb')
 # snk2vec = pickle.load(infile)
@@ -172,8 +186,6 @@ def train_model(num_epochs,
 #####################################################
 
 #%% LOAD raw description data data
-
-save_template = cf.DATA_DIR + "/{}.npy"
 
 id_label = np.load(os.path.join(cf.DATA_DIR,'mnp.npy'))  #IDs (filenames)
 descriptions = np.load(os.path.join(cf.DATA_DIR,'dnp.npy')) #description
