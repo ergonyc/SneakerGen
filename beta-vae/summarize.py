@@ -5,7 +5,7 @@
 # part 4:  create a streamlit app for visualizing the manifold...
 # part 4... how to explore the latent space
 
-#% %%%%%
+#%% %%%%%
 HOME = "/home/ergonyc"    #linux
 
 ROOT_DIR = HOME + "/Projects/Project2.0/SneakerGen/beta-vae"
@@ -20,22 +20,20 @@ txt_run_id = "1001-1830"
 
 params = dict(zip(["root_dir","img_run_id","txt_run_id","img_size","kl_weight"],[ROOT_DIR,img_run_id,txt_run_id,cf_img_size,cf_kl_weight]))
 
-#%  %%%%%%%%%
+#%%  %%%%%%%%%
 
 # load the data files
 def load_models_and_loss(p ):
     """
     load the models and loss so we can find the best fit.. 
 
-    input: params = dict (img_run_id, txt_run_id, img_size,kl_weight, ..)
+    input: params = dict (root_dir, img_run_id, txt_run_id, img_size,kl_weight, ..)
     """
-    pass
 
 
-
-    train_data = np.load(os.path.join(cf.DATA_DIR, 'train_data.npy'), allow_pickle=True)
-    val_data = np.load(os.path.join(cf.DATA_DIR, 'val_data.npy'), allow_pickle=True)
-    all_data = np.load(os.path.join(cf.DATA_DIR, 'all_data.npy'), allow_pickle=True)
+# train_data = np.load(os.path.join(cf.DATA_DIR, 'train_data.npy'), allow_pickle=True)
+# val_data = np.load(os.path.join(cf.DATA_DIR, 'val_data.npy'), allow_pickle=True)
+# all_data = np.load(os.path.join(cf.DATA_DIR, 'all_data.npy'), allow_pickle=True)
 
 ut.dump_pickle(os.path.join(lg.saved_data, f"losses_{total_epochs}.pkl"),curr_losses)
 ut.dump_pickle(os.path.join(lg.root_dir,"snk2vec.pkl"), snk2vec)
