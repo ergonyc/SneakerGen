@@ -28,7 +28,7 @@ DROPOUT_RATE = 0.15
 
 #%% CVAE Class that extends the standard keras model
 class CVAE(tf.keras.Model):
-    def __init__(self, latent_dim, input_dim, learning_rate=6e-4, training=True, kl_weight=1, name="autoencoder"):
+    def __init__(self, latent_dim, input_dim, learning_rate=6e-4, training=True, kl_weight=1.0, name="autoencoder"):
         super(CVAE, self).__init__()
 
         self.kl_weight = kl_weight
@@ -168,6 +168,7 @@ class CVAE(tf.keras.Model):
         self.gen_model.add(Dropout(DROPOUT_RATE))
         self.gen_model.add(Conv2DTranspose(filters=3, kernel_size=KERNEL_SZ, strides=1, padding="SAME"))
 
+
     def reconstruct(self, train_x, training):
         temp_training = self.training
         self.training = training
@@ -178,11 +179,13 @@ class CVAE(tf.keras.Model):
         self.training = temp_training
         return probs
 
+
     @tf.function
     def sample(self, eps=None):
         if eps is None:
             eps = tf.random.normal(shape=(5, self.latent_dim))
         return self.decode(eps, apply_sigmoid=True)
+
 
     def encode(self, x, reparam=False):
         #AH: changed axis=1 from axis=-1
@@ -223,12 +226,40 @@ class CVAE(tf.keras.Model):
         logpz = self.log_normal_pdf(z, 0.0, 0.0)
         logqz_x = self.log_normal_pdf(z, mean, logvar)
 
+
         kl_divergence = logqz_x - logpz
         neg_log_likelihood = -logpx_z
 
-        elbo = tf.math.reduce_mean(-self.kl_weight * kl_divergence - neg_log_likelihood)  # shape=()
+        #elbo = tf.math.reduce_mean(-self.kl_weight * kl_divergence - neg_log_likelihood)  # shape=()
+        neg_elbo = tf.math.reduce_mean(self.kl_weight * kl_divergence + neg_log_likelihood)  # shape=()
         self.training = temp_training
-        return -elbo
+        return neg_elbo
+
+
+    def get_test_loss_parts(self, x):
+        """
+        this is itentical to "compute_loss" function excep that training is turned off.
+        No gradients are saved and dropout is turned off.
+        NOTE: this is actually "cost" not loss since its across the batch...
+        """
+        temp_training = self.training
+        self.training = False
+        mean, logvar = self.encode(x)
+        z = self.reparameterize(mean, logvar)
+        x_logit = self.decode(z)
+
+        cross_ent = tf.nn.sigmoid_cross_entropy_with_logits(logits=x_logit, labels=x)
+        logpx_z = -tf.math.reduce_sum(cross_ent, axis=[1, 2, 3])  # JAH removed 3D axis=[1, 2, 3,4]
+        logpz = self.log_normal_pdf(z, 0.0, 0.0)
+        logqz_x = self.log_normal_pdf(z, mean, logvar)
+
+        kl_divergence = logqz_x - logpz
+        neg_log_likelihood = -logpx_z
+
+        #elbo = tf.math.reduce_mean(-self.kl_weight * kl_divergence - neg_log_likelihood)  # shape=()
+        self.training = temp_training
+
+        return neg_log_likelihood, kl_divergence
 
     @tf.function
     def compute_loss(self, x):
@@ -249,8 +280,8 @@ class CVAE(tf.keras.Model):
 
         neg_log_likelihood = -logpx_z
         #return -tf.reduce_mean(logpx_z + logpz - logqz_x)
-        elbo = tf.math.reduce_mean(-self.kl_weight*kl_divergence - neg_log_likelihood)  # shape=()
-        return -elbo
+        neg_elbo = tf.math.reduce_mean(self.kl_weight*kl_divergence + neg_log_likelihood)  # shape=()
+        return neg_elbo
 
     # # vae cost function as negative ELBO
     # @tf.function

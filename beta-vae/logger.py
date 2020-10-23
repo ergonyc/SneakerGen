@@ -50,7 +50,7 @@ class logger:
 
         self.new_run = root_dir is None
         if self.new_run:
-            self.root_dir = cf.IMG_RUN_DIR
+            self.root_dir = cf.IMGRUN_DIR
             self.root_dir = os.path.join(self.root_dir, ut.add_time_stamp())
         else:
             self.root_dir = root_dir
@@ -71,7 +71,7 @@ class logger:
 
         # for writing test and validate pkl record of dataset
         self.saved_data = os.path.join( self.root_dir, "saved_data")  
-        self.updatePlotDir()
+        self.update_plot_dir()
         
 
     def check_make_dirs(self):
@@ -87,7 +87,7 @@ class logger:
         make_dir(self.tblogs)
         make_dir(self.saved_data)
         #print(f"made {self.saved_data}")
-        self.setup_writer()
+        #self.setup_writer()
 
 
     def setup_writer(self):
@@ -114,7 +114,7 @@ class logger:
         with summary_writer.as_default():
             tf.summary.scalar(name=name,data=metric, step=self.total_epochs)
     
-            # tb_callback = tf.keras.callbacks.TensorBoard(LOG_DIR)
+        # tb_callback = tf.keras.callbacks.TensorBoard(LOG_DIR)
         # tb_callback.set_model(model)
     def increment_epoch(self):
         self.total_epochs = self.total_epochs + 1
@@ -128,6 +128,8 @@ class logger:
         self.cpmanager = tf.train.CheckpointManager(
             self.checkpoint, directory=self.model_saves, max_to_keep=(3 if (self.remote) else 20)
         )
+        self.setup_writer()
+
         # AH add for better tensorboard??
         # tb_callback = tf.keras.callbacks.TensorBoard(LOG_DIR)
         # tb_callback.set_model(model)        # tb_callback = tf.keras.callbacks.TensorBoard(LOG_DIR)
@@ -144,13 +146,11 @@ class logger:
             status = self.checkpoint.restore(self.cpmanager.latest_checkpoint)
             print("(NONE)Latest model chkp path is : {} setupWriter...".format(self.cpmanager.latest_checkpoint))
             #etl.set_dir(self.tblogs)
-            self.setup_writer()
             return status
         else:
             status = self.checkpoint.restore(path)
             print("Latest model chkp path is : {}  setupWriter".format(status))
-            #etl.set_dir(self.tblogs)
-            self.setup_writer()
+            #etl.set_dir(self.tblogs) 
             return status
 
     def write_config(self, variables, code):
@@ -171,5 +171,5 @@ class logger:
         for key, val in filtered_vars.items():
             w.writerow([key, val])
 
-    def updatePlotDir(self):
+    def update_plot_dir(self):
         ut.plot_out_dir = self.plot_out_dir

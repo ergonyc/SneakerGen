@@ -38,7 +38,7 @@ import tensorflow as tf
 
 AUTOTUNE = tf.data.experimental.AUTOTUNE
 
-JUPYTER_NOTEBOOK = False
+JUPYTER_NOTEBOOK = True
 
 # if JUPYTER_NOTEBOOK:
 # %reload_ext autoreload
@@ -64,13 +64,86 @@ tf.config.experimental.list_physical_devices('GPU')
 #%% Define Training methods
 
 
+def step_model(epochs, display_interval=-1, save_interval=10, test_interval=10,current_losses=([],[])) :
+    """
+    custom training loops to enable dumping images of the progress
+    """
+
+    model.training=False
+    elbo_test,elbo_train = current_losses
+    if len(elbo_test)>0:
+        print(f"test: n={len(elbo_test)}, last={elbo_test[-1]}")
+        print(f"train: n={len(elbo_train)}, last={elbo_train[-1]}")
+
+    for epoch in range(1, epochs + 1):
+        start_time = time.time()
+        losses = []
+        batch_index = 1
+
+        # DO THE AUGMENTATION HERE...
+        for train_x, label in train_dataset :
+            neg_ll, kl_div = model.get_test_loss_parts(train_x)
+            
+            loss_batch = neg_ll+kl_div
+
+            #neg_elbo = tf.math.reduce_mean(self.kl_weight *
+
+
+            losses.append(loss_batch)
+            stdout.write("\r[{:3d}/{:3d}]  ".format(batch_index, total_train_batchs))
+            stdout.flush()  
+
+            batch_index = batch_index + 1
+
+        ## TRAIN LOSS
+        elbo = np.mean(losses)
+        print(f'Epoch: {lg.total_epochs}   Train loss: {float(elbo):.1f}   Epoch Time: {float(time.time()-start_time):.2f}')
+        lg.log_metric(elbo, 'train loss',test=False)
+        elbo_train.append(elbo)
+
+        if ((display_interval > 0) & (epoch % display_interval == 0)) :
+            if epoch == 1:
+                ut.show_reconstruct(model, test_samples, title=lg.total_epochs, index=sample_index, show_original=True, save_fig=True, limits=cf_limits)    
+            else:
+                ut.show_reconstruct(model, test_samples, title=lg.total_epochs, index=sample_index, show_original=False, save_fig=True, limits=cf_limits)
+
+        ## TEST LOSSin chekmakedirs
+        test_losses = []
+        for test_x, test_label in test_dataset: # (dataset.take(batches).shuffle(100) if batches > 0 else dataset.shuffle(100)) :
+            #test_x = tf.cast(test_x, dtype=tf.float32) #might not need this
+            test_cost_batch = model.compute_test_loss(test_x)  # this should turn off the dropout...
+            test_losses.append(test_cost_batch)
+
+        test_loss = np.mean(test_losses)
+        print(f'   TEST LOSS  : {test_loss:.1f}    for epoch: {lg.total_epochs}')
+        lg.log_metric(test_loss, 'test loss',test=True)
+        elbo_test.append(test_loss)
+
+        ## SAVE
+        if epoch % save_interval == 0:
+            lg.save_checkpoint()
+
+        lg.increment_epoch()
+        if (ut.check_stop_signal(dir_path=cf.IMGRUN_DIR)) :
+            print(f"stoping at epoch = {epoch}")
+            break
+        else:
+            print(f"executed {epoch} epochs")
+    
+    out_losses = (elbo_train,elbo_test)
+    return epoch, out_losses #(loss_batch2,loss_batchN)
+
+
+
+
+
 def train_model(epochs, display_interval=-1, save_interval=10, test_interval=10,current_losses=([],[])) :
     """
     custom training loops to enable dumping images of the progress
     """
     print('\n\nStarting training...\n')
     model.training=True
-    elbo_test,elbo_train = current_losses
+    elbo_train,elbo_test = current_losses
     if len(elbo_test)>0:
         print(f"test: n={len(elbo_test)}, last={elbo_test[-1]}")
         print(f"train: n={len(elbo_train)}, last={elbo_train[-1]}")
@@ -235,6 +308,21 @@ for _ in train_dataset :
 # #%% Setup datasets
 sample_index = 1
 
+
+#%% lets pick apart our loss/cost
+# we already have our samples
+# train_samples, train_labels in train_dataset.take(1) : pass
+# test_samples, test_labels in test_dataset.take(1) : pass
+
+
+#%%
+
+ 
+
+
+
+
+
 #%% Training & Validation data save?
 # do we want to save the image data for the training set... i.e. the augmented bytes?
 dump_image_data = False
@@ -292,10 +380,15 @@ if dump_image_data:
 ##    - start where we left off
 ##
 #####################################################
+
+cf_root_dir = lg.root_dir  #make sure we log this
 # log Config...
 lg.write_config(locals(), [cv.CVAE, cv.CVAE.__init__])
 lg.update_plot_dir()
 #tf.config.experimental.list_physical_devices('GPU') 
+
+
+
 
 #%% 
 n_epochs = cf_num_epochs

@@ -8,16 +8,16 @@ and changes the filepaths accordingly for convenience.
 import os
 
 
-LATENT_DIM = 128
-IMG_SIZE = 224  # 224, 256 (128)
-KL_WEIGHT = 1.0
+LATENT_DIM = 64
+IMG_SIZE = 192  # 224, 256 (128)
+KL_WEIGHT = 20.0  # rough guess for "optimally disentangled"
 
-#CURR_IMGRUN_ID = '0930-2359'  
+#CURR_IMGRUN_ID = '1014-0001'  
 CURR_IMGRUN_ID = None  #train from scratch
 #CURR_TXTRUN_ID = '0922-1614'  
 CURR_TXTRUN_ID = None  #train from scratch
 N_IMGRUN_EPOCH = 400
-N_TXTRUN_EPOCH = 2200
+N_TXTRUN_EPOCH = 3000
 
 BATCH_SIZE = 32
 IMGRUN_LR = 4e-4

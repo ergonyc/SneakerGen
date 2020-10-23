@@ -423,8 +423,9 @@ def batch_data(ds,batch_size):
         [test_files,val_files,is_val]: [description]
     """
     ds = ds.batch(batch_size, drop_remainder=False)  #this might mess stuff up....
-    dataset = ds.prefetch(AUTOTUNE)
-    return dataset
+    return ds
+    #dataset = ds.prefetch(AUTOTUNE)
+    #return dataset
 
 
 def load_prep_and_batch_data(file_list, img_size,batch_size,augment=True):
@@ -435,6 +436,17 @@ def load_prep_and_batch_data(file_list, img_size,batch_size,augment=True):
     dataset = tf.data.Dataset.from_tensor_slices(file_list)
     dataset = load_and_prep_data(img_size,  dataset, augment=augment)
     dataset = batch_data(dataset,batch_size)
+    return dataset
+
+
+def load_and_prep_data2(file_list, img_size,batch_size,augment=True):
+    """
+    datain is numpy array of files.... .decode to see it?
+    """
+
+    dataset = tf.data.Dataset.from_tensor_slices(file_list)
+    dataset = load_and_prep_data(img_size,  dataset, augment=augment)
+    #dataset = batch_data(dataset,batch_size)
     return dataset
 
 ##############################################

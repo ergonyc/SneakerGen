@@ -116,6 +116,14 @@ cf_img_size = 224
 cf_kl_weight = 2.0  # with more cvae epichs... (overfitting)
 # 1007-1858
 
+
+
+img_run_id = "1014-001"  
+cf_img_size = 224  
+cf_kl_weight = 1176.0  # with more cvae epichs... (overfitting)
+# 1007-1858
+
+
 # infile = open(os.path.join(cf.SHAPE_RUN_DIR, img_run_id, "snk2vec.pkl"),'rb')
 # snk2vec = pickle.load(infile)
 # infile.close()
@@ -349,7 +357,7 @@ if train_from_scratch:
     np.save(os.path.join(lg.saved_data, 'train_txt_data.npy'), train_data, allow_pickle=True)
     np.save(os.path.join(lg.saved_data, 'val_txt_data.npy'), val_data, allow_pickle=True)
     np.save(os.path.join(lg.saved_data, 'all_txt_data.npy'), all_data, allow_pickle=True)
-    ut.dump_pickle(os.path.join(lg.saved_data, "snk2vec.pkl"), snk2vec)
+    #ut.dump_pickle(os.path.join(lg.saved_data, "snk2vec.pkl"), snk2vec)
 
     total_epochs = 0
     curr_losses = ([],[])
