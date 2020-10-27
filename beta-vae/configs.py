@@ -12,10 +12,10 @@ LATENT_DIM = 64
 IMG_SIZE = 192  # 224, 256 (128)
 KL_WEIGHT = 20.0  # rough guess for "optimally disentangled"
 
-#CURR_IMGRUN_ID = '1014-0001'  
-CURR_IMGRUN_ID = None  #train from scratch
-#CURR_TXTRUN_ID = '0922-1614'  
-CURR_TXTRUN_ID = None  #train from scratch
+# CURR_IMGRUN_ID = '1014-0001'
+CURR_IMGRUN_ID = None  # train from scratch
+# CURR_TXTRUN_ID = '0922-1614'
+CURR_TXTRUN_ID = None  # train from scratch
 N_IMGRUN_EPOCH = 400
 N_TXTRUN_EPOCH = 3000
 
@@ -30,8 +30,10 @@ VALIDATION_FRAC = 20.0 / 100.0  # standard 80/20 test/validate split
 # This folder path should only exist on the remote machine
 REMOTE = os.path.isdir("/data/sn/all")
 
-#HOME = "/Users/ergonyc"  #osx
-HOME = "/home/ergonyc"    #linux
+# HOME = "/Users/ergonyc"  #osx
+# HOME = "/home/ergonyc"    #linux
+HOME = os.environ.get("HOME")
+
 
 if REMOTE:  # Running on EC2 instance or similar
     META_DATA_CSV = "/data/sn/all/meta/dfmeta.csv"

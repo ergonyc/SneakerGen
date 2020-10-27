@@ -138,9 +138,9 @@ def get_sub_dirs(a_dir):
     return [name for name in os.listdir(a_dir) if os.path.isdir(os.path.join(a_dir, name))]
 
 
+##############################################
+##############################################
 
-##############################################
-##############################################
 
 def parse_function(filename, label):
     image_string = tf.read_file(filename)
@@ -158,7 +158,7 @@ def parse_function(filename, label):
 def zoom_in(image, zoomf, pad_value=1.0):
     # returns a square image the size of the inital width
     shape_f = tf.cast(tf.shape(image), tf.float32)
-        
+
     initial_height, initial_width = shape_f[0], shape_f[1]
     # if initial_height != initial_width:
     #     print("WARNING:  the imput image should have been square!!!")
@@ -359,14 +359,14 @@ def load_and_prep_for_testing(target_size, input, cf_batch_size):
     return batch1, batch2
 
 
-
 ###############
 ############
 
-def check_for_datafiles(data_directory,files):
-    
+
+def check_for_datafiles(data_directory, files):
+
     for f in files:
-        if os.path.exists(os.path.join(cf.DATA_DIR,f)):
+        if os.path.exists(os.path.join(cf.DATA_DIR, f)):
             have_files = True
         else:
             have_files = False
@@ -374,8 +374,10 @@ def check_for_datafiles(data_directory,files):
 
     return have_files
 
-    #double check all our data exists
-#  
+    # double check all our data exists
+
+
+#
 def split_shuffle_data(files, test_split):
     """[prepares the dataset by splitting into training and testing. 
         presumably the random seed being set above will make it semi-
@@ -390,29 +392,27 @@ def split_shuffle_data(files, test_split):
     """
 
     for _ in range(100):  # shuffle 100 times
-       np.random.shuffle(files)
+        np.random.shuffle(files)
 
     data_size = files.shape[0]
     train_size = int((1.0 - test_split) * data_size)
     ceil = lambda x: int(-(-x // 1))
     val_size = ceil(test_split * data_size)
 
-    is_val = np.zeros(data_size,dtype=int)
-    is_val[train_size:]=1
+    is_val = np.zeros(data_size, dtype=int)
+    is_val[train_size:] = 1
 
     train_data = files[0:train_size]
     val_data = files[train_size:]
 
-    assert len(train_data) == train_size , "split wasn't clean (train)"
-    assert len(val_data) == val_size , "split wasn't clean (validate)"
-    #all_data = zip(files,is_val)
-    all_data = [list(z) for z in zip(files,is_val)]
+    assert len(train_data) == train_size, "split wasn't clean (train)"
+    assert len(val_data) == val_size, "split wasn't clean (validate)"
+    # all_data = zip(files,is_val)
+    all_data = [list(z) for z in zip(files, is_val)]
     return train_data, val_data, all_data
 
 
-
-
-def batch_data(ds,batch_size):
+def batch_data(ds, batch_size):
     """[batches the dataset]
 
     Args:
@@ -422,32 +422,33 @@ def batch_data(ds,batch_size):
     Returns:
         [test_files,val_files,is_val]: [description]
     """
-    ds = ds.batch(batch_size, drop_remainder=False)  #this might mess stuff up....
+    ds = ds.batch(batch_size, drop_remainder=False)  # this might mess stuff up....
     return ds
-    #dataset = ds.prefetch(AUTOTUNE)
-    #return dataset
+    # dataset = ds.prefetch(AUTOTUNE)
+    # return dataset
 
 
-def load_prep_and_batch_data(file_list, img_size,batch_size,augment=True):
+def load_prep_and_batch_data(file_list, img_size, batch_size, augment=True):
     """
     datain is numpy array of files.... .decode to see it?
     """
 
     dataset = tf.data.Dataset.from_tensor_slices(file_list)
-    dataset = load_and_prep_data(img_size,  dataset, augment=augment)
-    dataset = batch_data(dataset,batch_size)
+    dataset = load_and_prep_data(img_size, dataset, augment=augment)
+    dataset = batch_data(dataset, batch_size)
     return dataset
 
 
-def load_and_prep_data2(file_list, img_size,batch_size,augment=True):
+def load_and_prep_data2(file_list, img_size, batch_size, augment=True):
     """
     datain is numpy array of files.... .decode to see it?
     """
 
     dataset = tf.data.Dataset.from_tensor_slices(file_list)
-    dataset = load_and_prep_data(img_size,  dataset, augment=augment)
-    #dataset = batch_data(dataset,batch_size)
+    dataset = load_and_prep_data(img_size, dataset, augment=augment)
+    # dataset = batch_data(dataset,batch_size)
     return dataset
+
 
 ##############################################
 ##############################################
@@ -522,6 +523,7 @@ def make_gif_from_dir(gif_in_dir, name):
     subprocess.call(
         "convert -delay 15 -loop 0 " + gif_in_dir + "*{000..XXX}.png " + str(name) + ".gif", shell=True
     )
+
 
 def _padEnc(text, vocab):
     texts = text if type(text) == list else [text]

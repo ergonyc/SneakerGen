@@ -11,7 +11,7 @@ import os
 from sys import stdout
 import time
 import json
-import pandas as pd
+import pandas as pd0
 import random
 import pickle
 import matplotlib.pyplot as plt
@@ -40,6 +40,7 @@ cf_batch_size = cf.BATCH_SIZE #32
 cf_learning_rate = cf.IMGRUN_LR #4e-4
 cf_limits = [cf_img_size, cf_img_size]
 cf_pixel_dim = cf_img_size*cf_img_size*3
+cf_dim_x = (cf_img_size, cf_img_size, 3)
 #( *-*) ( *-*)>⌐■-■ ( ⌐■-■)
 #
 cf_kl_weight = cf.KL_WEIGHT
@@ -88,8 +89,47 @@ test_dataset =  ut.load_prep_and_batch_data(  val_data, cf_img_size, cf_batch_si
 
 #%% ####################   check that the model is okay   ####################
 
-vae = cv.BCVAE(latent_dim=cf_latent_dim, input_dim=cf_img_size, 
-                 learning_rate=0.0001, beta=cf_beta, training=False)
+# vae = cv.BCVAE(latent_dim=cf_latent_dim, input_dim=cf_img_size, 
+#                  learning_rate=0.0001, beta=cf_beta, training=False)
+
+
+
+for test_samples, test_labels in test_dataset.take(1): 
+    pass
+for train_samples, train_labels in train_dataset.take(1): 
+    pass
+#%%
+import importlib
+importlib.reload(cv) # works
+
+#%%
+####################   The following code shows how to train the model   ####################
+# set hyperparameters
+batch_size = 32
+latent_dim=64
+lr = 0.0005
+kl_w = 3
+epochs = 10
+
+# model training
+vae = cv.BCVAE(dim_z=latent_dim, dim_x=cf_dim_x, learning_rate=lr, kl_weight=kl_w) # analytic_kl=True,
+loss_metric = tf.keras.metrics.Mean()
+opt = tf.keras.optimizers.Adam(vae.learning_rate)
+
+
+for epoch in range(epochs):
+    start_time = time.time()
+    for train_x, label in tqdm(train_dataset):
+        cv.train_step(train_x, vae, opt, loss_metric)
+
+    end_time = time.time()
+    elbo = -loss_metric.result()
+    #display.clear_output(wait=False)
+    print('Epoch: {}, Train set ELBO: {}, time elapse for current epoch: {}'.format(
+            epoch, elbo, end_time - start_time))
+    # generate_images(vae, test_sample)
+
+
 
 
 #%%
@@ -1451,3 +1491,90 @@ ut.dump_pickle(os.path.join(lg.root_dir,"snk2loss.pkl"), snk2loss)
 
 #################
 #################
+#dense_z_input = tf.keras.layers.Dense(pix_dim*pix_dim*60, activation = None, input_shape = dim_x)
+dense_z_input = tf.keras.layers.Dense(units=3*4* (pix_dim//16)**2 , activation=None, input_shape=(dim_z,))
+reshape_layer = tf.keras.layers.Reshape((pix_dim//16,pix_dim//16,3*4))
+
+def Conv2D(
+    input_shape=None,
+    filters=32,
+    kernel_size=KERNEL_SZ,
+    strides=2,
+    padding="SAME",
+    activation="relu",
+    kernel_regularizer=tf.keras.regularizers.l2(REGULARIZE_FACT),
+):
+
+    if input_shape is None:
+        return tfkl.Conv2D(
+            filters=filters,
+            kernel_size=kernel_size,
+            strides=strides,  # (strides,strides)?
+            padding=padding,
+            activation=activation,
+            kernel_regularizer=kernel_regularizer,
+        )
+    else:
+        return tfkl.Conv2D(
+            filters=filters,
+            input_shape=input_shape,
+            kernel_size=kernel_size,
+            strides=strides,  # (strides,strides)?
+            padding=padding,
+            activation=activation,
+            kernel_regularizer=kernel_regularizer,
+        )
+
+
+def Conv2DTranspose(
+    input_shape=None,
+    filters=32,
+    kernel_size=KERNEL_SZ,
+    strides=2,
+    padding="SAME",
+    activation="relu",
+    kernel_regularizer=tf.keras.regularizers.l2(REGULARIZE_FACT),
+):
+
+    if input_shape is None:
+        return tfkl.Conv2DTranspose(
+            filters=filters,
+            kernel_size=kernel_size,
+            strides=strides,  # (strides,strides)?
+            padding=padding,
+            activation=activation,
+            kernel_regularizer=kernel_regularizer,
+        )
+    else:
+        return tfkl.Conv2DTranspose(
+            filters=filters,
+            input_shape=input_shape,
+            kernel_size=kernel_size,
+            strides=strides,  # (strides,strides)?
+            padding=padding,
+            activation=activation,
+            kernel_regularizer=kernel_regularizer,
+        )
+
+# conv_transpose_layer_4 = Conv2DTranspose(filters=1)
+conv_transpose_layer_3 = Conv2DTranspose(filters=32)
+conv_transpose_layer_2 = Conv2DTranspose(filters=64)
+conv_transpose_layer_1 = Conv2DTranspose(filters=128)
+conv_transpose_layer_0 = Conv2DTranspose(filters=256)
+
+# turn into RGB
+conv_transpose_layer_4 = tfkl.Conv2DTranspose(filters=3, kernel_size=KERNEL_SZ, strides=1, padding="SAME")
+
+x = train_samples
+z_sample, mu, sd = vae.encoder(x)
+z = z_sample
+
+x_ = vae.decoder(z)
+
+x_out_in = dense_z_input(z)
+x_output = reshape_layer(x_out_in)#[32, 192, 192, 60]
+        x_output1 = conv_transpose_layer_0(x_output) #32, 384, 384, 256]
+        x_output2 = conv_transpose_layer_1(x_output1)
+        x_output3 = conv_transpose_layer_2(x_output2)
+        x_output4 = conv_transpose_layer_3(x_output3)
+        x_output5 = conv_transpose_layer_4(x_output4)
