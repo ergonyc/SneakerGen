@@ -24,6 +24,8 @@ import utils as ut
 import logger
 import configs as cf
 
+import importlib
+
 AUTOTUNE = tf.data.experimental.AUTOTUNE
 
 JUPYTER_NOTEBOOK = True
@@ -99,7 +101,6 @@ for test_samples, test_labels in test_dataset.take(1):
 for train_samples, train_labels in train_dataset.take(1): 
     pass
 #%%
-import importlib
 importlib.reload(cv) # works
 
 #%%

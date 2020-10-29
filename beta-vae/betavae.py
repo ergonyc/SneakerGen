@@ -4,18 +4,11 @@ It contains both the encoder and decoder part of the model.
 """
 
 #%% Imports
+
 import tensorflow as tf
-from tensorflow.keras.layers import (
-    Dense,
-    Conv2D,
-    Conv2DTranspose,
-    InputLayer,
-    Flatten,
-    Reshape,
-    Dropout,
-    BatchNormalization,
-)
-from tensorflow.keras import regularizers
+
+import tensorflow.keras.layers as tfkl
+
 import numpy as np
 import os
 
@@ -44,6 +37,8 @@ class BCVAE(tf.keras.Model):
         self.kl_analytic = tf.keras.metrics.Mean(name="kla")
         
         # WHAT ARE THESE BEING USED FOR...
+        # i think to make sure we have enough dimensions to start with for our sequence of 256->128->64->32->3
+        # convoloutional layers
         self.gen_layers = 5  # from 5
         self.gen_init_size = int(input_dim / (2 ** (self.gen_layers - 1)))
         self.reshape_channels = 20
@@ -53,126 +48,135 @@ class BCVAE(tf.keras.Model):
         REGULARIZE_FACT = 0.001
 
         self.enc_model = tf.keras.Sequential()
-        self.enc_model.add(InputLayer(input_shape=(input_dim, input_dim, 3)))
+        self.enc_model.add(tfkl.InputLayer(input_shape=(input_dim, input_dim, 3)))
         self.enc_model.add(
-            Conv2D(
+            tfkl.Conv2D(
                 filters=16,
                 kernel_size=KERNEL_SZ,
                 strides=2,
                 padding="SAME",
                 activation="relu",
-                kernel_regularizer=regularizers.l2(REGULARIZE_FACT),
+                kernel_regularizer=tf.keras.regularizers.l2(REGULARIZE_FACT),
             )
         )
-        self.enc_model.add(Dropout(DROPOUT_RATE))
+        self.enc_model.add(tfkl.Dropout(DROPOUT_RATE))
         self.enc_model.add(
-            Conv2D(
+            tfkl.Conv2D(
                 filters=32,
                 kernel_size=KERNEL_SZ,
                 strides=2,
                 padding="SAME",
                 activation="relu",
-                kernel_regularizer=regularizers.l2(REGULARIZE_FACT),
+                kernel_regularizer=tf.keras.regularizers.l2(REGULARIZE_FACT),
             )
         )
-        self.enc_model.add(Dropout(DROPOUT_RATE))
+        self.enc_model.add(tfkl.Dropout(DROPOUT_RATE))
         self.enc_model.add(
-            Conv2D(
+            tfkl.Conv2D(
                 filters=64,
                 kernel_size=KERNEL_SZ,
                 strides=2,
                 padding="SAME",
                 activation="relu",
-                kernel_regularizer=regularizers.l2(REGULARIZE_FACT),
+                kernel_regularizer=tf.keras.regularizers.l2(REGULARIZE_FACT),
             )
         )
-        self.enc_model.add(Dropout(DROPOUT_RATE))
+        self.enc_model.add(tfkl.Dropout(DROPOUT_RATE))
         self.enc_model.add(
-            Conv2D(
+            tfkl.Conv2D(
                 filters=128,
                 kernel_size=KERNEL_SZ,
                 strides=2,
                 padding="SAME",
                 activation="relu",
-                kernel_regularizer=regularizers.l2(REGULARIZE_FACT),
+                kernel_regularizer=tf.keras.regularizers.l2(REGULARIZE_FACT),
             )
         )
-        self.enc_model.add(Dropout(DROPOUT_RATE))
+        self.enc_model.add(tfkl.Dropout(DROPOUT_RATE))
         self.enc_model.add(
-            Conv2D(
+            tfkl.Conv2D(
                 filters=256,
                 kernel_size=KERNEL_SZ,
                 strides=2,
                 padding="SAME",
                 activation="relu",
-                kernel_regularizer=regularizers.l2(REGULARIZE_FACT),
+                kernel_regularizer=tf.keras.regularizers.l2(REGULARIZE_FACT),
             )
         )
         # this is the latent represention...
-        self.enc_model.add(Flatten())
-        self.enc_model.add(Dense(latent_dim + latent_dim))
-
+        self.enc_model.add(tfkl.Flatten())
+        self.enc_model.add(tfkl.Dense(latent_dim + latent_dim))
         # ENCODE ^^^^
         #########################------------------------------
         # DECODE vvvv
 
         self.gen_model = tf.keras.Sequential()
-        self.gen_model.add(InputLayer(input_shape=(latent_dim,)))
+        self.gen_model.add(tfkl.InputLayer(input_shape=(latent_dim,)))
         self.gen_model.add(
-            Dense(
+            tfkl.Dense(
                 units=(self.gen_init_size ** 2) * 3 * self.reshape_channels,
                 activation=tf.nn.relu,
-                kernel_regularizer=regularizers.l2(REGULARIZE_FACT),
+                kernel_regularizer=tf.keras.regularizers.l2(REGULARIZE_FACT),
             )
         )
         self.gen_model.add(
-            Reshape(target_shape=(self.gen_init_size, self.gen_init_size, 3 * self.reshape_channels))
+            tfkl.Reshape(target_shape=(self.gen_init_size, self.gen_init_size, 3 * self.reshape_channels))
         )
         self.gen_model.add(
-            Conv2DTranspose(
+            tfkl.Conv2DTranspose(
                 filters=256,
                 kernel_size=KERNEL_SZ,
                 strides=2,
                 padding="SAME",
                 activation="relu",
-                kernel_regularizer=regularizers.l2(REGULARIZE_FACT),
+                kernel_regularizer=tf.keras.regularizers.l2(REGULARIZE_FACT),
             )
         )
-        self.gen_model.add(Dropout(DROPOUT_RATE))
+        self.gen_model.add(tfkl.Dropout(DROPOUT_RATE))
         self.gen_model.add(
-            Conv2DTranspose(
+            tfkl.Conv2DTranspose(
                 filters=128,
                 kernel_size=KERNEL_SZ,
                 strides=2,
                 padding="SAME",
                 activation="relu",
-                kernel_regularizer=regularizers.l2(REGULARIZE_FACT),
+                kernel_regularizer=tf.keras.regularizers.l2(REGULARIZE_FACT),
             )
         )
-        self.gen_model.add(Dropout(DROPOUT_RATE))
+        self.gen_model.add(tfkl.Dropout(DROPOUT_RATE))
         self.gen_model.add(
-            Conv2DTranspose(
+            tfkl.Conv2DTranspose(
                 filters=64,
                 kernel_size=KERNEL_SZ,
                 strides=2,
                 padding="SAME",
                 activation="relu",
-                kernel_regularizer=regularizers.l2(REGULARIZE_FACT),
+                kernel_regularizer=tf.keras.regularizers.l2(REGULARIZE_FACT),
             )
         )
-        self.gen_model.add(Dropout(DROPOUT_RATE))
+        self.gen_model.add(tfkl.Dropout(DROPOUT_RATE))
         self.gen_model.add(
-            Conv2DTranspose(
+            tfkl.Conv2DTranspose(
                 filters=32,
                 kernel_size=KERNEL_SZ,
                 strides=2,
                 padding="SAME",
-                activation="relu",
-                kernel_regularizer=regularizers.l2(REGULARIZE_FACT),
+                kernel_regularizer=tf.keras.regularizers.l2(REGULARIZE_FACT),
             )
         )
-        self.gen_model.add(Dropout(DROPOUT_RATE))
-        self.gen_model.add(Conv2DTranspose(filters=3, kernel_size=KERNEL_SZ, strides=1, padding="SAME"))
+
+        self.gen_model.add(tfkl.Dropout(DROPOUT_RATE))
+        self.gen_model.add(
+            tfkl.Conv2DTranspose(
+                filters=16,
+                kernel_size=KERNEL_SZ,
+                strides=2,
+                padding="SAME",
+                kernel_regularizer=tf.keras.regularizers.l2(REGULARIZE_FACT),
+            )
+        )
+        self.gen_model.add(tfkl.Dropout(DROPOUT_RATE))
+        self.gen_model.add(tfkl.Conv2DTranspose(filters=3, kernel_size=KERNEL_SZ, strides=1, padding="SAME")) #activation=sigmoid?
 
 
 
@@ -201,12 +205,13 @@ class BCVAE(tf.keras.Model):
 
 
     def reparameterize(self, mu, logvar):
-        eps = tf.random.normal(shape=mu.get_shape())
+        eps = tf.random.normal(shape=(self.latent_dim,))
         #sig = tf.math.exp(0.5*logvar) 
         #log_sig = logvar*0.5  #sqrt
         # if batchn := mu.shape[0] < 32:
         #     eps = tf.slice(eps,[0,0],[32-batchn,self.latent_dim])
-        return eps * tf.exp(logvar * 0.5) + mu
+        return eps* tf.exp(logvar * 0.0) + mu*0.
+        #return eps * tf.exp(logvar * 0.5) + mu
 
     def decode(self, z, apply_sigmoid=False):
         logits = self.gen_model(z, training=self.training)

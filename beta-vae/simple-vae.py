@@ -17,10 +17,16 @@ from tqdm import tqdm
 import glob
 import tensorflow as tf
 
-import betavae as cv
+import tensorflow_probability as tfp
+
+#import betavae as cv
+import pcvae as cv
+
 import utils as ut
 import logger
 import configs as cf
+
+import importlib
 
 AUTOTUNE = tf.data.experimental.AUTOTUNE
 
@@ -48,7 +54,6 @@ cf_val_frac = cf.VALIDATION_FRAC
 #%%  are we GPU-ed?
 tf.config.experimental.list_physical_devices('GPU') 
 #%% helpers
-
 
 #%% #################################################
 ##
@@ -83,11 +88,441 @@ train_dataset = ut.load_prep_and_batch_data(train_data, cf_img_size, cf_batch_si
 test_dataset =  ut.load_prep_and_batch_data(  val_data, cf_img_size, cf_batch_size, augment=False)
 
 
+#%%
+importlib.reload(cv) # works
 
 #%% ####################   check that the model is okay   ####################
 
-vae = cv.BCVAE(latent_dim=cf_latent_dim, input_dim=cf_img_size, 
-                 learning_rate=0.0001, beta=cf_beta, training=False)
+# vae = cv.PCVAE(latent_dim=cf_latent_dim, input_dim=cf_img_size, 
+#                  learning_rate=0.0001, beta=cf_beta, training=False)
+
+
+vae1 = cv.PCVAE(dim_z=cf_latent_dim, dim_x=(cf_img_size,cf_img_size,3), 
+                 learning_rate=0.0001, kl_weight=cf_beta)
+
+
+vae2 = cv.PCVAE_KL_Reg(dim_z=cf_latent_dim, dim_x=(cf_img_size,cf_img_size,3), 
+                 learning_rate=0.0001)
+
+
+for test_samples, test_labels in test_dataset.take(1): 
+    pass
+for train_samples, train_labels in train_dataset.take(1): 
+    pass
+
+#%%  Run the Training loops
+
+
+vae1 = cv.PCVAE(dim_z=cf_latent_dim, dim_x=(cf_img_size,cf_img_size,3), 
+                 learning_rate=0.0001, kl_weight=cf_beta)
+
+
+vae2 = cv.PCVAE_KL_Reg(dim_z=cf_latent_dim, dim_x=(cf_img_size,cf_img_size,3), 
+                 learning_rate=0.0001)
+
+
+
+#%%
+
+
+# epochs = 4
+# betas = np.linspace(1,1.1*(cf_pixel_dim/cf_latent_dim),num=15).round(decimals=0)
+
+# betas = [.1, .5, 1, 2, 3, 4, 5, 8, 16, 25, 32, 50, 64, 100, 150, 256, 400, 750, 1000,1500, 2000, 2750]
+# #beta_norm = ((cf_latent_dim/cf_pixel_dim)*betas).round(decimals=3)
+
+# # def kl_loss(y_true, y_pred):
+# #     kl_loss =  -0.5 * K.sum(1 + log_var - K.square(mean_mu) - K.exp(log_var), axis = 1)
+# #     return kl_loss
+
+# # def nll_loss(y_true, y_pred):
+# #     return LOSS_FACTOR*r_loss(y_true, y_pred) + kl_loss(y_true, y_pred)
+
+# # vae_model.compile(optimizer=adam_optimizer, loss = total_loss, metrics = [nll_loss, kl_loss])
+
+# betas = [1,5]
+
+# beta = 1.
+
+# vae = cv.PCVAE(latent_dim=cf_latent_dim, input_dim=cf_img_size, 
+#             learning_rate=cf_learning_rate, beta=beta, training=True)
+        
+# vae.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=cf_learning_rate))#, loss=[tf.keras.losses.mse])
+
+#%%
+x = test_samples
+#%%
+importlib.reload(cv) # works
+
+
+vae1 = cv.PCVAE(dim_z=cf_latent_dim, dim_x=(cf_img_size,cf_img_size,3), 
+                 learning_rate=0.0001, kl_weight=cf_beta)
+
+
+vae2 = cv.PCVAE_KL_Reg(dim_z=cf_latent_dim, dim_x=(cf_img_size,cf_img_size,3), 
+                 learning_rate=0.0001)
+
+
+#%%
+# model training
+kl_loss1 = tf.keras.metrics.Mean()
+
+loss_metric1 = tf.keras.metrics.Mean()
+loss_metric2 = tf.keras.metrics.Mean()
+
+opt1 = tf.keras.optimizers.Adam(vae1.learning_rate)
+opt2 = tf.keras.optimizers.Adam(vae2.learning_rate)
+
+
+#%%
+epochs = 10
+for epoch in range(epochs):
+    start_time = time.time()
+    loss_metric1.reset_states()
+    loss_metric2.reset_states()
+    kl_loss.reset_states()
+    for train_x,_ in tqdm(train_dataset):
+        cv.train_step(train_x, vae1, opt1, loss_metric1,kl_loss1)
+        cv.train_step_KL_Reg(train_x, vae2, opt2, loss_metric2)
+        
+    end_time = time.time()
+    elbo1 = loss_metric1.result()
+    kl_div = kl_loss1.result()
+    elbo2 = loss_metric2.result()
+
+    #display.clear_output(wait=False)
+    print('Epoch: {}, Train set ELBO1: {}:{}(), ELBO2: {}, time elapse for current epoch: {}'.format(
+            epoch, elbo1,kl_div, elbo2, end_time - start_time))
+
+    #generate_images(vae, test_sample)
+
+
+#%%
+import kcvae as kcv 
+
+#%%
+importlib.reload(kcv) # works
+
+
+
+def make_dir(dirname):
+    if os.path.isdir(dirname):
+        return
+    else:
+        os.mkdir(dirname)
+
+#%%
+
+vae1 = kcv.K_PCVAE(dim_z=cf_latent_dim, dim_x=(cf_img_size,cf_img_size,3), 
+                 learning_rate=0.0001, kl_weight=cf_beta)
+
+vae4 = kcv.K_PCVAE_KL_Reg(dim_z=cf_latent_dim, dim_x=(cf_img_size,cf_img_size,3), 
+                 learning_rate=0.0001, kl_weight=cf_beta)
+
+
+
+#%%
+epochs = 10
+
+
+vae3 = kcv.K_PCVAE(dim_z=cf_latent_dim, dim_x=(cf_img_size,cf_img_size,3), 
+                 learning_rate=0.0001, kl_weight=cf_beta)
+
+vae4 = kcv.K_PCVAE_KL_Reg(dim_z=cf_latent_dim, dim_x=(cf_img_size,cf_img_size,3), 
+                 learning_rate=0.0001, kl_weight=cf_beta)
+
+
+vae3.compile(optimizer=vae3.optimizer, loss = vae3.partial_vae_loss)
+
+            
+train_history = vae3.fit(train_dataset,epochs=epochs, 
+                        verbose=1, validation_data=test_dataset)
+                        #, initial_epoch = 11 )
+
+history = train_history.history
+
+
+# def kl_loss(y_true, y_pred):
+#     kl_loss =  -0.5 * K.sum(1 + log_var - K.square(mean_mu) - K.exp(log_var), axis = 1)
+#     return kl_loss
+
+# def nll_loss(y_true, y_pred):
+#     return LOSS_FACTOR*r_loss(y_true, y_pred) + kl_loss(y_true, y_pred)
+
+# vae_model.compile(optimizer=adam_optimizer, loss = total_loss, metrics = [nll_loss, kl_loss])
+
+#%%
+epochs = 20
+betas = [1]
+
+for beta in betas:
+    
+    if beta >= 1:
+        beta_str = f"{int(beta):04d}"
+    else:
+        beta_str = f"{beta:.1f}"
+
+
+    vae = kcv.K_PCVAE(dim_z=cf_latent_dim, dim_x=(cf_img_size,cf_img_size,3), 
+                 learning_rate=0.0001, kl_weight=beta)
+
+    vae.compile(optimizer=vae.optimizer, loss = vae.partial_vae_loss)
+
+    train_history = vae.fit(train_dataset,epochs=epochs, 
+                            verbose=1, validation_data=test_dataset)
+                            #, initial_epoch = 11 )
+
+    history = train_history.history
+    ut.dump_pickle(os.path.join("data2",f"KCVAE_history_{beta_str}.pkl"), (history,betas,epochs))
+    sv_path = os.path.join("data2",f"{beta_str}")
+    make_dir(sv_path)
+    print('save model')
+    vae.save_model(sv_path, epochs)
+
+
+    # vae = kcv.K_PCVAE_KL_Reg(dim_z=cf_latent_dim, dim_x=(cf_img_size,cf_img_size,3), 
+    #              learning_rate=0.0001, kl_weight=beta)
+    # vae.compile(optimizer=vae.optimizer, loss = vae.partial_vae_loss)
+    # train_history = vae.fit(train_dataset,epochs=epochs, 
+    #                         verbose=1, validation_data=test_dataset)
+    #                         #, initial_epoch = 11 )
+    # history = train_history.history
+    # ut.dump_pickle(os.path.join("data3",f"KCVAE_reg_history_{beta_str}.pkl"), (history,betas,epochs))
+    # sv_path = os.path.join("data3",f"{beta_str}")
+    # make_dir(sv_path)
+    # print('save model')
+    # vae.save_model(sv_path, epochs)
+
+
+#%%
+
+
+betas = [.1, .5, 1, 2, 3, 4, 5, 8,16,32]
+epochs = 250
+for beta in betas:
+    
+    if beta > 1:
+        beta_str = f"{int(beta):04d}"
+    else:
+        beta_str = f"{beta:.1f}"
+
+
+    vae = kcv.K_PCVAE(dim_z=cf_latent_dim, dim_x=(cf_img_size,cf_img_size,3), 
+                 learning_rate=0.0001, kl_weight=cf_beta)
+    vae.compile(optimizer=vae.optimizer, loss = vae.partial_vae_loss)
+
+    # always start from the "warmed up beta=1, 20 epochs weights"
+    sv_path = os.path.join("data2","0001")
+    vae.load_model(sv_path, 20)  
+    
+    
+    vae = kcv.K_PCVAE(dim_z=cf_latent_dim, dim_x=(cf_img_size,cf_img_size,3), 
+                 learning_rate=0.0001, kl_weight=beta)
+
+    vae.compile(optimizer=vae.optimizer, loss = vae.partial_vae_loss)
+
+    train_history = vae.fit(train_dataset,epochs=epochs, 
+                            verbose=1, validation_data=test_dataset)
+                            #, initial_epoch = 11 )
+
+    history = train_history.history
+    ut.dump_pickle(os.path.join("data2",f"KCVAE_history_{beta_str}.pkl"), (history,betas,epochs))
+    sv_path = os.path.join("data2",f"{beta_str}")
+    make_dir(sv_path)
+    print('save model')
+    vae.save_model(sv_path, epochs)
+
+
+
+
+    # vae = kcv.K_PCVAE_KL_Reg(dim_z=cf_latent_dim, dim_x=(cf_img_size,cf_img_size,3), 
+    #              learning_rate=0.0001, kl_weight=beta)
+    # vae.compile(optimizer=vae3.optimizer, loss = vae3.partial_vae_loss)
+    # train_history = vae.fit(train_dataset,epochs=epochs, 
+    #                         verbose=1, validation_data=test_dataset)
+    #                         #, initial_epoch = 11 )
+    # history = train_history.history
+    # ut.dump_pickle(os.path.join("data3",f"KCVAE_history_{beta_str}.pkl"), (history,betas,epochs))
+    # sv_path = os.path.join("data3",f"{beta_str}")
+    # make_dir(sv_path)
+    # print('save model')
+    # vae.save_model(sv_path, epochs)
+
+
+
+
+
+
+
+
+
+#%%
+
+for epoch in range(epochs):
+    start_time = time.time()
+    loss_metric1.reset_states()
+    loss_metric2.reset_states()
+    kl_loss.reset_states()
+    for train_x,_ in tqdm(train_dataset):
+    
+        
+        
+    end_time = time.time()
+    elbo1 = loss_metric1.result()
+    kl_div = kl_loss1.result()
+    elbo2 = loss_metric2.result()
+
+    #display.clear_output(wait=False)
+    print('Epoch: {}, Train set ELBO1: {}:{}(), ELBO2: {}, time elapse for current epoch: {}'.format(
+            epoch, elbo1,kl_div, elbo2, end_time - start_time))
+
+    #generate_images(vae, test_sample)
+
+
+#%%
+
+
+x_input = x #[32, 192, 192, 3]
+
+z = vae.encoder.conv_layer_0(x_input) #[32, 96, 96, 3]
+z = vae.encoder.conv_layer_1(z) #[32, 48, 48, 32]
+z = vae.encoder.conv_layer_2(z) #[32, 24, 24, 64]
+z = vae.encoder.conv_layer_3(z) #[32, 12, 12, 128]
+#z = vae.encoder.dropout_layer(z)
+z = vae.encoder.conv_layer_4(z) #[32, 6, 6, 256])
+z = vae.encoder.flatten_layer(z)# ([32, 9216]
+
+z_ = vae.encoder.sampler(z)
+z = vae.encoder.normalTFP(z_)
+#%%
+prior = vae.encoder.prior
+
+lnormalTFP = tfp.layers.MultivariateNormalTriL(vae.encoder.dim_z,
+                        activity_regularizer=tfp.layers.KLDivergenceRegularizer(prior))
+
+
+x_output = vae.decoder.input_l(z) #[32, 64]
+x_output = vae.decoder.reshape_layer(x_output) #[32, 1, 1, 64]
+x_output = vae.decoder.conv_transpose_layer_start(x_output) #[32, 12, 12, 256])
+x_output = vae.decoder.conv_transpose_layer_0(x_output)#[32, 24, 24, 128])
+x_output = vae.decoder.conv_transpose_layer_1(x_output)#[32, 48, 48, 64])
+x_output = vae.decoder.conv_transpose_layer_2(x_output) # [32, 96, 96,  32]
+x_output = vae.decoder.conv_transpose_layer_3(x_output) #[32, 192, 192, 16]
+
+#x_output = vae.decoder.dropout_layer(x_output)
+x_output = vae.decoder.conv_transpose_layer_4(x_output) # [32, 1024, 1024, 3]
+
+
+
+#%%
+
+# model training
+vae = VAE_MNIST(dim_z=latent_dim, learning_rate=lr, analytic_kl=True, kl_weight=kl_w)
+loss_metric = tf.keras.metrics.Mean()
+opt = tfk.optimizers.Adam(vae.learning_rate)
+
+for epoch in range(epochs):
+    start_time = time.time()
+    for train_x in tqdm(train_dataset):
+        train_step(train_x, vae, opt, loss_metric)
+    end_time = time.time()
+    elbo = -loss_metric.result()
+    #display.clear_output(wait=False)
+    print('Epoch: {}, Train set ELBO: {}, time elapse for current epoch: {}'.format(
+            epoch, elbo, end_time - start_time))
+    #generate_images(vae, test_sample)
+
+
+#%%
+
+for train_x, train_label in train_dataset.take(1):
+    results = vae.train_step(train_x)
+results
+#%%
+
+        z_sample, z_mu, z_logvar = vae.encode(x,reparam=True)
+
+        # why is the negative in the reduce_mean?
+        # kl_div_a =  - 0.5 * tf.math.reduce_sum(1 + tf.math.log(tf.math.square(sd)) 
+        #                                         - tf.math.square(mu) 
+        #                                         - tf.math.square(sd),   axis=1)
+        kl_div_a = - 0.5 * tf.math.reduce_sum(1 + z_logvar 
+                                                - tf.math.square(z_mu) 
+                                                - tf.math.exp(z_logvar), axis=1)
+
+                                                
+        x_recons = vae.decode(z_sample,apply_sigmoid=True)
+        #x_logits = self.decode(z_sample)
+        # z_mu, z_logvar = self.encode(x)
+
+        # z = self.reparameterize(z_mu, z_logvar)
+        # x_recons = self.decode(z,apply_sigmoid=True)
+        
+        # log_likelihood log normal is MSE
+        # loss is [0, 255]
+        # mse = 0.00392156862745098* tf.math.squared_difference(255.*x,255.*x_recons)# 0.00392156862745098 - 1/255.
+        mse = tf.math.squared_difference(x,x_recons)
+
+        # for images the neg LL is the MSE
+        neg_log_likelihood = tf.math.reduce_sum(mse, axis=[1, 2, 3])
+
+        # # compute reverse KL divergence, either analytically 
+        # # MC KL:         # or through MC approximation with one sample
+        # logpz = self.log_normal_pdf(z, 0., 0.) #standard lognormal: mu = 0. logvar=0.
+        # logqz_x = self.log_normal_pdf(z, z_mu, z_logvar)
+        # kl_div_mc = logqz_x - logpz
+        
+        # def normal_log_pdf(sample, mean, logvar, raxis=1):
+        #     log2pi = tf.math.log(2. * np.pi)
+        #     return tf.reduce_sum( -.5 * ((sample - mean) ** 2. * tf.exp(-logvar) + logvar + log2pi),axis=raxis)
+
+
+        def analytic_kl(sample, mean, logvar, raxis=1):
+            # log((qz||x)/pz = difference in the log of the gaussian PDF
+            log2pi = tf.math.log(2. * np.pi)
+            logpz = tf.reduce_sum( -.5 * ((sample*sample) + log2pi),axis=raxis)
+            logqz_x = tf.reduce_sum( -.5 * ((sample - mean) ** 2. * tf.exp(-logvar) + logvar + log2pi),axis=raxis)
+            return logqz_x - logpz
+
+        kl_div_mc = analytic_kl(z_sample, z_mu, z_logvar)  # shape=(batch_size,)
+        
+
+        # # analytic KL for representing SIGMA (log_sig)
+        # # kl_div_a = - 0.5 * tf.math.reduce_sum(
+        # #                                 1 + 0.5*z_logvar - tf.math.square(z_mu) - tf.math.exp(0.5*z_logvar), axis=1)
+        # # KL for representing the VARIANCE
+        # kl_div_a = - 0.5 * tf.math.reduce_sum(
+        #                                 1 + z_logvar - tf.math.square(z_mu) - tf.math.exp(z_logvar), axis=1)
+
+        elbo = tf.math.reduce_mean(-vae.beta * kl_div_a - neg_log_likelihood)  # shape=()
+        kl = tf.math.reduce_mean(kl_div_mc)  # shape=()
+        nll = tf.math.reduce_mean(neg_log_likelihood)  # shape=()
+        kla = tf.math.reduce_mean(kl_div_a)  # shape=()
+
+
+
+
+plt.imshow(x[20,].numpy().squeeze())
+plt.imshow(x_recons[20,].numpy().squeeze())
+plt.imshow(mse[20,].numpy().squeeze())
+
+cost_mini_batch = -elbo
+
+#%%
+
+for train_x, train_label in train_dataset.take(1):
+    results = vae.train_step(train_x)
+results
+#%%
+            
+train_history = vae.fit(train_dataset,epochs=epochs, 
+                        verbose=1, validation_data=test_dataset)
+                        #, initial_epoch = 11 )
+
+
+history = train_history.history
+
+
 
 
 #%%
@@ -219,142 +654,79 @@ def make_dir(dirname):
 
 
 
-for test_samples, test_labels in test_dataset.take(1): 
-    pass
-for train_samples, train_labels in train_dataset.take(1): 
-    pass
-
-#%%  Run the Training loops
-
-
-
-
-epochs = 4
-betas = np.linspace(1,1.1*(cf_pixel_dim/cf_latent_dim),num=15).round(decimals=0)
-
-betas = [.1, .5, 1, 2, 3, 4, 5, 8, 16, 25, 32, 50, 64, 100, 150, 256, 400, 750, 1000,1500, 2000, 2750]
-#beta_norm = ((cf_latent_dim/cf_pixel_dim)*betas).round(decimals=3)
-
-# def kl_loss(y_true, y_pred):
-#     kl_loss =  -0.5 * K.sum(1 + log_var - K.square(mean_mu) - K.exp(log_var), axis = 1)
-#     return kl_loss
-
-# def nll_loss(y_true, y_pred):
-#     return LOSS_FACTOR*r_loss(y_true, y_pred) + kl_loss(y_true, y_pred)
-
-# vae_model.compile(optimizer=adam_optimizer, loss = total_loss, metrics = [nll_loss, kl_loss])
-
-betas = [1,5]
-
-beta = 1.
-
-vae = cv.BCVAE(latent_dim=cf_latent_dim, input_dim=cf_img_size, 
-            learning_rate=cf_learning_rate, beta=beta, training=True)
-        
-vae.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=cf_learning_rate))#, loss=[tf.keras.losses.mse])
-
-
-x = test_samples
-#%%
-
-for train_x, train_label in train_dataset.take(1):
-    results = vae.train_step(train_x)
-results
-#%%
-
-        z_sample, z_mu, z_logvar = vae.encode(x,reparam=True)
-
-        # why is the negative in the reduce_mean?
-        # kl_div_a =  - 0.5 * tf.math.reduce_sum(1 + tf.math.log(tf.math.square(sd)) 
-        #                                         - tf.math.square(mu) 
-        #                                         - tf.math.square(sd),   axis=1)
-        kl_div_a = - 0.5 * tf.math.reduce_sum(1 + z_logvar 
-                                                - tf.math.square(z_mu) 
-                                                - tf.math.exp(z_logvar), axis=1)
-
-                                                
-        x_recons = vae.decode(z_sample,apply_sigmoid=True)
-        #x_logits = self.decode(z_sample)
-        # z_mu, z_logvar = self.encode(x)
-
-        # z = self.reparameterize(z_mu, z_logvar)
-        # x_recons = self.decode(z,apply_sigmoid=True)
-        
-        # log_likelihood log normal is MSE
-        # loss is [0, 255]
-        # mse = 0.00392156862745098* tf.math.squared_difference(255.*x,255.*x_recons)# 0.00392156862745098 - 1/255.
-        mse = tf.math.squared_difference(x,x_recons)
-
-        # for images the neg LL is the MSE
-        neg_log_likelihood = tf.math.reduce_sum(mse, axis=[1, 2, 3])
-
-        # # compute reverse KL divergence, either analytically 
-        # # MC KL:         # or through MC approximation with one sample
-        # logpz = self.log_normal_pdf(z, 0., 0.) #standard lognormal: mu = 0. logvar=0.
-        # logqz_x = self.log_normal_pdf(z, z_mu, z_logvar)
-        # kl_div_mc = logqz_x - logpz
-        
-        # def normal_log_pdf(sample, mean, logvar, raxis=1):
-        #     log2pi = tf.math.log(2. * np.pi)
-        #     return tf.reduce_sum( -.5 * ((sample - mean) ** 2. * tf.exp(-logvar) + logvar + log2pi),axis=raxis)
-
-
-        def analytic_kl(sample, mean, logvar, raxis=1):
-            # log((qz||x)/pz = difference in the log of the gaussian PDF
-            log2pi = tf.math.log(2. * np.pi)
-            logpz = tf.reduce_sum( -.5 * ((sample*sample) + log2pi),axis=raxis)
-            logqz_x = tf.reduce_sum( -.5 * ((sample - mean) ** 2. * tf.exp(-logvar) + logvar + log2pi),axis=raxis)
-            return logqz_x - logpz
-
-        kl_div_mc = analytic_kl(z_sample, z_mu, z_logvar)  # shape=(batch_size,)
-        
-
-        # # analytic KL for representing SIGMA (log_sig)
-        # # kl_div_a = - 0.5 * tf.math.reduce_sum(
-        # #                                 1 + 0.5*z_logvar - tf.math.square(z_mu) - tf.math.exp(0.5*z_logvar), axis=1)
-        # # KL for representing the VARIANCE
-        # kl_div_a = - 0.5 * tf.math.reduce_sum(
-        #                                 1 + z_logvar - tf.math.square(z_mu) - tf.math.exp(z_logvar), axis=1)
-
-        elbo = tf.math.reduce_mean(-vae.beta * kl_div_a - neg_log_likelihood)  # shape=()
-        kl = tf.math.reduce_mean(kl_div_mc)  # shape=()
-        nll = tf.math.reduce_mean(neg_log_likelihood)  # shape=()
-        kla = tf.math.reduce_mean(kl_div_a)  # shape=()
-
-
-
-
-plt.imshow(x[20,].numpy().squeeze())
-plt.imshow(x_recons[20,].numpy().squeeze())
-plt.imshow(mse[20,].numpy().squeeze())
-
-cost_mini_batch = -elbo
-
-#%%
-
-for train_x, train_label in train_dataset.take(1):
-    results = vae.train_step(train_x)
-results
-#%%
-            
-train_history = vae.fit(train_dataset,epochs=epochs, 
-                        verbose=1, validation_data=test_dataset)
-                        #, initial_epoch = 11 )
-
-
-history = train_history.history
-
-
-
-
 
 #%% 
+mse = tf.math.squared_difference(x,x_hat)
+nl = lambda x: tf.math.log(1.+x)
+
+vmin,vmax = np.log(np.finfo(float).eps),0-np.finfo(float).eps
+mx_ = lambda x: x.numpy().squeeze().max()
+mn_ = lambda x: x.numpy().squeeze().min()
+mn_mx = lambda x: (x.numpy().squeeze().min(), x.numpy().squeeze().max())
+mn_mx = lambda x: (mn_(x), mx_(x))
+
+vmin,vmax = mn_mx(nl(x_hat))
+
+
+# nl = lambda x: x  #do nothing
+#vmin,vmax = -1,1
+
+for i in range(2):
+    fig, axs = plt.subplots(nrows=3,ncols=3, sharex=True, sharey=False, gridspec_kw={'hspace': 0})
+    fig.set_size_inches(16, 24)
+
+    cmaps = ['Reds','Blues','Greens']
+    for c in range(3):
+        cmap = cmaps[c]
+        ax =axs[c][0]
+        vals = nl(x[i,:,:,c]).numpy().squeeze()
+        pos = ax.imshow(vals,cmap=cmap, vmin=vmin, vmax=vmax,
+                                interpolation='none') 
+        #fig.colorbar(pos, ax=ax)
+
+
+        ax =axs[c][1]
+        vals = nl(x_hat[i,:,:,c]).numpy().squeeze()
+        pos = ax.imshow(vals,cmap=cmap, vmin=vmin, vmax=vmax,
+                                interpolation='none') 
+        #fig.colorbar(pos, ax=ax)
+
+        ax =axs[c][2]
+        vals = nl(mse[i,:,:,c]).numpy().squeeze()
+        pos = ax.imshow(vals,cmap=cmap, vmin=vmin, vmax=vmax,
+                                interpolation='none') 
+        fig.colorbar(pos, ax=ax)
+
+    plt.show()
+
+
+#%%
+
+fig, (ax1, ax2, ax3) = plt.subplots(figsize=(13, 3), ncols=3)
+
+# plot just the positive data and save the
+# color "mappable" object returned by ax1.imshow
+pos = ax1.imshow(Zpos, cmap='Blues', interpolation='none')
+
+# add the colorbar using the figure's method,
+# telling which mappable we're talking about and
+# which axes object it should be near
+fig.colorbar(pos, ax=ax1)
+
+# repeat everything above for the negative data
+neg = ax2.imshow(Zneg, cmap='Reds_r', interpolation='none')
+fig.colorbar(neg, ax=ax2)
+
+
+
+
+
 
 
 epochs = 4
 betas = np.linspace(1,1.1*(cf_pixel_dim/cf_latent_dim),num=15).round(decimals=0)
 
-betas = [.1, .5, 1, 2, 3, 4, 5, 8, 16, 25, 32, 50, 64, 100, 150, 256, 400, 750, 1000,1500, 2000, 2750]
+betas = [.1, .5, 1, 2, 3, 4, 5, 8]
 #beta_norm = ((cf_latent_dim/cf_pixel_dim)*betas).round(decimals=3)
 
 # def kl_loss(y_true, y_pred):
@@ -366,7 +738,6 @@ betas = [.1, .5, 1, 2, 3, 4, 5, 8, 16, 25, 32, 50, 64, 100, 150, 256, 400, 750, 
 
 # vae_model.compile(optimizer=adam_optimizer, loss = total_loss, metrics = [nll_loss, kl_loss])
 
-betas = [1,5]
 for beta in betas:
     
     if beta > 1:

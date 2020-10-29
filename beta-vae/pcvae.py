@@ -1,14 +1,20 @@
 """
-This file is the shape encoder model which is a convolutional variational autoencoder.
-It contains both the encoder and decoder part of the model.
+tf prob for the variational encoder without using Keras Sequential
 """
 
 #%% Imports
-import tensorflow as tf
-import tensorflow.keras as tfk
-import tensorflow.keras.layers as tfkl
 
-# import tensorflow_probability as tfp
+import tensorflow as tf
+import tensorflow_probability as tfp
+
+# import tensorflow_probability.layers as tfpl
+# import tensorflow.keras.layers as tfkl
+
+# is this a better way to import shortcuts??
+tfpl = tfp.layers
+tfkl = tf.keras.layers
+
+import functools
 
 import numpy as np
 import os
@@ -21,10 +27,10 @@ DROPOUT_RATE = 0.15
 DROPOUT_RATE = 0.15  # i may not have enouth data for dropout...
 REGULARIZE_FACT = 0.001
 
-#%% BCVAE Class that extends the standard keras model
+#%% PCVAE Class that extends the standard keras model
 
 
-class Sampler_Z(tfk.layers.Layer):
+class Sampler_Z(tfkl.Layer):
     """
     Sampling Layer Class for the "reparam" trick
     """
@@ -39,12 +45,28 @@ class Sampler_Z(tfk.layers.Layer):
         return z_sample, sd
 
 
+# deconv = functools.partial(
+#       tf.keras.layers.Conv2DTranspose, padding="SAME", activation=activation)
+
+# conv = functools.partial(
+#       tf.keras.layers.Conv2D, 
+#         padding="SAME", 
+#         activation=activation,
+#         filters=32,
+#         kernel_size=KERNEL_SZ,
+#         strides=2,
+#         padding="SAME",
+#         activation="relu",
+#         kernel_regularizer=tf.keras.regularizers.l2(REGULARIZE_FACT
+#        )
+
+
 def Conv2D(
     input_shape=None,
     filters=32,
     kernel_size=KERNEL_SZ,
     strides=2,
-    padding="SAME",
+    padding="same",
     activation="relu",
     kernel_regularizer=tf.keras.regularizers.l2(REGULARIZE_FACT),
 ):
@@ -78,11 +100,10 @@ def Conv2DTranspose(
     filters=32,
     kernel_size=KERNEL_SZ,
     strides=2,
-    padding="SAME",
+    padding="same",
     activation="relu",
     kernel_regularizer=tf.keras.regularizers.l2(REGULARIZE_FACT),
 ):
-
     """
     Local wrapper for tf.keras.Conv2DTranspose units where only the filters
     is changing    
@@ -108,14 +129,17 @@ def Conv2DTranspose(
         )
 
 
-class Encoder_Z(tfk.layers.Layer):
+class Encoder_Z_KL_Reg(tfkl.Layer):
+    """
+    KL Div is treated as an activity regularizer on the tensorflow Probability encoder
+    """
     def __init__(self, dim_z=64, dim_x=(192, 192, 3), name="encoder", **kwargs):
         super(Encoder_Z, self).__init__(name=name, **kwargs)
         self.pix_dim = dim_x[0]
         self.dim_x = dim_x
         self.dim_z = dim_z
-
-        # tfkl.InputLayer(input_shape=dim_x)
+        self.prior = tfp.distributions.Independent(tfp.distributions.Normal(loc=tf.zeros(self.dim_z), scale=1),
+                        reinterpreted_batch_ndims=1)
 
         self.dropout_layer = tfkl.Dropout(DROPOUT_RATE)
         self.conv_layer_0 = Conv2D(filters=16, input_shape=self.dim_x)
@@ -125,9 +149,12 @@ class Encoder_Z(tfk.layers.Layer):
         self.conv_layer_4 = Conv2D(filters=256)
 
         self.flatten_layer = tfkl.Flatten()
-        self.dense_mean = tfkl.Dense(self.dim_z, activation=None, name="z_mean")
-        self.dense_raw_stddev = tfkl.Dense(self.dim_z, activation=None, name="z_raw_stddev")
-        self.sampler_z = Sampler_Z(self.dim_z)
+
+
+        self.sampler = tfkl.Dense(tfp.layers.MultivariateNormalTriL.params_size(self.dim_z),activation=None)
+           
+        self.normalTFP = tfpl.MultivariateNormalTriL(self.dim_z,
+                        activity_regularizer=tfpl.KLDivergenceRegularizer(self.prior))
 
     # Functional
     def call(self, x_input):
@@ -141,13 +168,13 @@ class Encoder_Z(tfk.layers.Layer):
         z = self.dropout_layer(z)
         z = self.conv_layer_4(z)
         z = self.flatten_layer(z)
-        mu = self.dense_mean(z)
-        rho = self.dense_raw_stddev(z)
-        z_sample, sd = self.sampler_z((mu, rho))
-        return z_sample, mu, sd
+
+        z = self.sampler(z)
+        z = self.normalTFP(z)
+        return z
 
 
-class Decoder_X(tfk.layers.Layer):
+class Decoder_X(tfkl.Layer):
     def __init__(self, dim_z, dim_x, name="decoder", **kwargs):
         super(Decoder_X, self).__init__(name=name, **kwargs)
         # n_layers = 5
@@ -157,83 +184,208 @@ class Decoder_X(tfk.layers.Layer):
         self.dim_z = dim_z
         self.dim_x = dim_x
         self.pix_dim = dim_x[0]
-        self.dense_z_input = tfkl.Dense(
-            units=(self.pix_dim // 16) ** 2 * 3 * 4, activation=None, input_shape=self.dim_x
+
+        n_layers = 5
+        init_dim = self.pix_dim//(2** (n_layers-1))
+
+        self.input_l = tfkl.InputLayer(input_shape=[self.dim_z])
+
+        # self.dense_z_input = tfkl.Dense(
+        #     units=(self.pix_dim // 16) ** 2 * 3 * 4, activation=None, input_shape=self.dim_x
+        # )
+        #self.reshape_layer = tfkl.Reshape((self.pix_dim // 16, self.pix_dim // 16, 3 * 4))
+        self.reshape_layer = tfkl.Reshape((1, 1, self.dim_z))
+
+        self.conv_transpose_layer_start = tfkl.Conv2DTranspose(
+            filters=256,
+            kernel_size=init_dim,
+            strides=1,  # (strides,strides)?
+            padding="valid",
+            activation="relu",
+            kernel_regularizer=tf.keras.regularizers.l2(REGULARIZE_FACT),
         )
-        self.reshape_layer = tfkl.Reshape((self.pix_dim // 16, self.pix_dim // 16, 3 * 4))
         self.conv_transpose_layer_4 = tfkl.Conv2DTranspose(
-            filters=3, kernel_size=KERNEL_SZ, strides=1, padding="SAME", activation="sigmoid"
+            filters=3, kernel_size=KERNEL_SZ, strides=1, padding="SAME", activation=None
         )
-        self.conv_transpose_layer_3 = Conv2DTranspose(filters=32)
-        self.conv_transpose_layer_2 = Conv2DTranspose(filters=64)
-        self.conv_transpose_layer_1 = Conv2DTranspose(filters=128)
-        self.conv_transpose_layer_0 = Conv2DTranspose(filters=256)
+        # self.conv_transpose_layer_3b = Conv2DTranspose(filters=8)
+        # self.conv_transpose_layer_3a = Conv2DTranspose(filters=16)
+        self.conv_transpose_layer_3 = Conv2DTranspose(filters=16)
+        self.conv_transpose_layer_2 = Conv2DTranspose(filters=32)
+        self.conv_transpose_layer_1 = Conv2DTranspose(filters=64)
+        self.conv_transpose_layer_0 = Conv2DTranspose(filters=128)
         self.dropout_layer = tfkl.Dropout(DROPOUT_RATE)
 
     # Functional
     def call(self, z):
-        x_output = self.dense_z_input(z)
+        x_output = self.input_l(z)
         x_output = self.reshape_layer(x_output)
+        x_output = self.conv_transpose_layer_start(x_output)
         x_output = self.conv_transpose_layer_0(x_output)
-        z = self.dropout_layer(z)
+        x_output = self.dropout_layer(x_output)
         x_output = self.conv_transpose_layer_1(x_output)
-        z = self.dropout_layer(z)
+        x_output = self.dropout_layer(x_output)
         x_output = self.conv_transpose_layer_2(x_output)
-        z = self.dropout_layer(z)
+        x_output = self.dropout_layer(x_output)
         x_output = self.conv_transpose_layer_3(x_output)
-        z = self.dropout_layer(z)
+        x_output = self.dropout_layer(x_output)
+        # x_output = self.conv_transpose_layer_3a(x_output)
+        # x_output = self.dropout_layer(x_output)
+        # x_output = self.conv_transpose_layer_3b(x_output)
+        # x_output = self.dropout_layer(x_output)
         x_output = self.conv_transpose_layer_4(x_output)
 
         return x_output
 
 
-class BCVAE(tfk.Model):
-    def __init__(self, dim_z, dim_x, learning_rate, kl_weight=1, name="autoencoder", **kwargs):
-        super(BCVAE, self).__init__(name=name, **kwargs)
+class PCVAE_KL_Reg(tf.keras.Model):
+    def __init__(self, dim_z, dim_x, learning_rate, name="autoencoder", **kwargs):
+        super(PCVAE_KL_Reg, self).__init__(name=name, **kwargs)
         self.dim_x = dim_x
         self.dim_z = dim_z
 
         self.learning_rate = learning_rate
         self.encoder = Encoder_Z(dim_z=self.dim_z)
         self.decoder = Decoder_X(dim_z=self.dim_z, dim_x=self.dim_x)
-        self.kl_weight = kl_weight  # beta
+
 
     # def encode_and_decode(self, x_input):
     def call(self, x_input):
-        z_sample, mu, sd = self.encoder(x_input)
-        # maybe need to put this through a sigmoid??
-        x_recons_logits = self.decoder(z_sample)
 
-        kl_divergence = -0.5 * tf.math.reduce_sum(
-            1 + tf.math.log(tf.math.square(sd)) - tf.math.square(mu) - tf.math.square(sd), axis=1
-        )
-        kl_divergence = tf.math.reduce_mean(kl_divergence)
-        # self.add_loss(lambda: self.kl_weight * kl_divergence)
-        self.add_loss(self.kl_weight * kl_divergence)
-        return x_recons_logits
+        z = self.encoder(x_input)
+        x_logits = self.decoder(z)
+        # this is the raw output... no "activation" has been applied...
+        x_hat = tf.math.sigmoid(x_logits)
+        
+        return x_hat
+        
+        # z_sample, mu, sd = self.encoder(x_input)
+        # # maybe need to put this through a sigmoid??
+        # x_recons_logits = self.decoder(z_sample)
+
+        # kl_divergence = -0.5 * tf.math.reduce_sum(
+        #     1 + tf.math.log(tf.math.square(sd)) - tf.math.square(mu) - tf.math.square(sd), axis=1
+        # )
+        # kl_divergence = tf.math.reduce_mean(kl_divergence)
+        # # self.add_loss(lambda: self.kl_weight * kl_divergence)
+        # self.add_loss(self.kl_weight * kl_divergence)
+    
+
+class Encoder_Z(tfkl.Layer):
+    """
+    KL Div will be calculated and added as loss
+    """
+    def __init__(self, dim_z=64, dim_x=(192, 192, 3), kl_weight=1.0, name="encoder", **kwargs):
+        super(Encoder_Z, self).__init__(name=name, **kwargs)
+        self.pix_dim = dim_x[0]
+        self.dim_x = dim_x
+        self.dim_z = dim_z
+        self.kl_weight = kl_weight
+        self.prior = tfp.distributions.Independent(tfp.distributions.Normal(loc=tf.zeros(self.dim_z), scale=1),
+                       reinterpreted_batch_ndims=1)
 
 
+        # tfkl.InputLayer(input_shape=dim_x)
+
+        self.dropout_layer = tfkl.Dropout(DROPOUT_RATE)
+        self.conv_layer_0 = Conv2D(filters=16, input_shape=self.dim_x)
+        self.conv_layer_1 = Conv2D(filters=32)
+        self.conv_layer_2 = Conv2D(filters=64)
+        self.conv_layer_3 = Conv2D(filters=128)
+        self.conv_layer_4 = Conv2D(filters=256)
+
+        self.flatten_layer = tfkl.Flatten()
+        # self.dense_mean = tfkl.Dense(self.dim_z, activation=None, name="z_mean")
+        # self.dense_raw_stddev = tfkl.Dense(self.dim_z, activation=None, name="z_raw_stddev")
+        # self.sampler_z = Sampler_Z(self.dim_z)
+
+        self.sampler = tfkl.Dense(tfp.layers.MultivariateNormalTriL.params_size(self.dim_z),activation=None)
+           
+        self.normalTFP = tfpl.MultivariateNormalTriL(self.dim_z,
+                        activity_regularizer=None ) #tfpl.KLDivergenceRegularizer(self.prior))
+        #self.enc_model.add(tfkl.Dense(latent_dim + l
+        self.kl_lossTFP =        tfpl.KLDivergenceAddLoss(
+            tfp.distributions.MultivariateNormalDiag(loc=tf.zeros(self.dim_z)),
+            weight = self.kl_weight ) #scale defaults to identity
+        #self.kl_lossTFP =        tfpl.KLDivergenceAddLoss(self.prior),#weight = self.kl_weight ),
+
+    # Functional
+    def call(self, x_input):
+        z = self.conv_layer_0(x_input)
+        z = self.dropout_layer(z)
+        z = self.conv_layer_1(z)
+        z = self.dropout_layer(z)
+        z = self.conv_layer_2(z)
+        z = self.dropout_layer(z)
+        z = self.conv_layer_3(z)
+        z = self.dropout_layer(z)
+        z = self.conv_layer_4(z)
+        z = self.flatten_layer(z)
+
+        z = self.sampler(z)
+        z = self.normalTFP(z)
+        z = self.kl_lossTFP(z)
+
+        return z
+
+        # mu = self.dense_mean(z)
+        # rho = self.dense_raw_stddev(z)
+        # z_sample, sd = self.sampler_z((mu, rho))
+        # return z_sample, mu, sd
+
+
+
+class PCVAE(tf.keras.Model):
+    def __init__(self, dim_z, dim_x, learning_rate, kl_weight=1, name="autoencoder", **kwargs):
+        super(PCVAE, self).__init__(name=name, **kwargs)
+        self.dim_x = dim_x
+        self.dim_z = dim_z
+        self.kl_weight = kl_weight  # beta
+
+        self.learning_rate = learning_rate
+        self.encoder = Encoder_Z(dim_z=self.dim_z,kl_weight=self.kl_weight)
+        self.decoder = Decoder_X(dim_z=self.dim_z, dim_x=self.dim_x)
+
+    # def encode_and_decode(self, x_input):
+    def call(self, x_input):
+        z = self.encoder(x_input)
+        x_logits = self.decoder(z)
+        # this is the raw output... no "activation" has been applied...
+        x_hat = tf.math.sigmoid(x_logits)
+        return x_hat
+
+    
 # vae loss function -- only the negative log-likelihood part,
 # since we use add_loss for the KL divergence part
 def partial_vae_loss(x_true, model):
     # x_recons_logits = model.encode_and_decode(x_true)
-    x_recons_logits = model(x_true)
+    x_hat = model(x_true)
     # compute cross entropy loss for each dimension of every datapoint
     # change this to MSE
-    mse = tf.math.squared_difference(tf.keras.activations.sigmoid(x_recons_logits), x_true)
+    mse = tf.math.squared_difference(x_hat, x_true)
     neg_log_likelihood = tf.math.reduce_sum(mse, axis=[1, 2, 3])
     return tf.math.reduce_mean(neg_log_likelihood)
 
 
-def train_step(x_true, model, optimizer, loss_metric):
+def train_step_KL_Reg(x_true, model, optimizer, loss_metric):
     with tf.GradientTape() as tape:
         neg_log_lik = partial_vae_loss(x_true, model)
-        # kl_loss = model.losses[-1]
-        kl_loss = tf.math.reduce_sum(model.losses)  # vae.losses is a list
+
+    gradients = tape.gradient(neg_log_lik, model.trainable_variables)
+    optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+    loss_metric(neg_log_lik)
+
+
+def train_step(x_true, model, optimizer, loss_metric, kl_loss_metric):
+    with tf.GradientTape() as tape:
+        neg_log_lik = partial_vae_loss(x_true, model)
+        kl_loss_l = model.encoder.kl_lossTFP.losses 
+        kl_loss = kl_loss_l[-1] # make sure its the last entry in the list... 
         total_vae_loss = neg_log_lik + kl_loss
     gradients = tape.gradient(total_vae_loss, model.trainable_variables)
     optimizer.apply_gradients(zip(gradients, model.trainable_variables))
     loss_metric(total_vae_loss)
+    kl_loss_metric(kl_loss)
+
 
 
 #     def reconstruction_loss(X, X_pred):
@@ -554,6 +706,29 @@ def train_step(x_true, model, optimizer, loss_metric):
 #     def load_model(self, dir_path, epoch):
 #         self.enc_model.load_weights(os.path.join(dir_path, "enc_epoch_{}.h5".format(epoch)))
 #         self.gen_model.load_weights(os.path.join(dir_path, "dec_epoch_{}.h5".format(epoch)))
+
+
+#%% CVAE Class that extends the standard keras model
+#  From the arcitecture shared from Emmanuel Fuentes. examples from GOAT
+# Architecture Hyperparameters:
+#     Latent Size (research default 256, production default 32)
+#     Filter Factor Size (research default 16, production default 32)
+#     Latent Linear Hidden Layer Size (research default 2048, production default 1024)
+# The encoder architecture is as follows with research defaults from above:
+#     Input 3x128x128 (conv2d block [conv2d, batchnorm2d, relu])
+#     16x64x64 (conv2d block [conv2d, batchnorm2d, relu])
+#     32x32x32 (conv2d block [conv2d, batchnorm2d, relu])
+#     64x16x16 (conv2d block [conv2d, batchnorm2d, relu])
+#     128x8x8 (conv2d block [conv2d, batchnorm2d, relu])
+#     Flatten to 8192
+#     2048 (linear block [linear, batchnorm1d, relu])
+#     Split the 2048 dimension into mu and log variance for the parameters of the latent distribution
+#     Latent mu size 256 (linear layer only with bias)
+#     Latent logvar size 256 (linear layer only with bias)
+
+
+# %%
+
 
 
 #%% CVAE Class that extends the standard keras model
