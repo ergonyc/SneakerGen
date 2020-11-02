@@ -41,6 +41,7 @@ try:
 
     import cvae as cv
     import textspacy as ts
+
 except:
     header.header("Server is currently overloaded, please try again later!")
     server_up = False
@@ -543,12 +544,12 @@ def manual():
     header.title("Streamlit App Manual")
     st.write(
         """
-            This is my streamlit app for version 2.0 of my Insight DS.SV.2020A project: SnkrFinder  (http:/ergodatainsights.tech)
+            This is my streamlit app for version 2.0 of my Insight DS.SV.2020A project: SnkrFinder  (formerly http:/ergodatainsights.tech)
             
             See slides related to the development of this app [here](http://bit.ly/SneakerFinder-slides) 
             and the github repo with code [here](https://github.com/ergonyc/SneakerFinder.
             
-            **Below is an example of what can be generated. Input was 'a regular chair with four legs.'**
+            **Below is an example of what can be generated. Input was xxx**
             """
     )
 

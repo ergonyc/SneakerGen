@@ -111,7 +111,7 @@ def Conv2DTranspose(
 #
 ###################################
 
-def encoder_z_KL_reg(dim_z=64,dim_x=(192,192,3), kl_weight=3.0):
+def encoder_z_KL_reg(dim_z=64,dim_x=(192,192,3), kl_weight=1.0):
     # self.encoder_input = Input(shape=(self.hps['max_seq_len'], 5), name='encoder_input')
     # decoder_input = Input(shape=(self.hps['max_seq_len'], 5), name='decoder_input')
 
@@ -149,7 +149,7 @@ def encoder_z_KL_reg(dim_z=64,dim_x=(192,192,3), kl_weight=3.0):
     
     return encoder_z
  
-def encoder_z(dim_z=64, dim_x=(192,192,3), kl_weight=3.0):
+def encoder_z(dim_z=64, dim_x=(192,192,3), kl_weight=1.0):
     # self.encoder_input = Input(shape=(self.hps['max_seq_len'], 5), name='encoder_input')
     # decoder_input = Input(shape=(self.hps['max_seq_len'], 5), name='decoder_input')
 
@@ -188,7 +188,7 @@ def encoder_z(dim_z=64, dim_x=(192,192,3), kl_weight=3.0):
         tfpl.KLDivergenceAddLoss(
             prior, #tfp.distributions.Normal(loc=tf.zeros(dim_z), scale=1),
             #test_points_fn=tf.convert_to_tensor,
-            #weight = kl_weight ,
+            weight = kl_weight ,
             name="kl_loss"), #scale defaults to identity
         ],        
 
@@ -254,7 +254,7 @@ class K_PCVAE(tf.keras.Model):
         self.learning_rate = learning_rate
         self.optimizer = tf.keras.optimizers.Adam(self.learning_rate)
 
-        self.encoder = encoder_z(dim_z = dim_z, dim_x=dim_x,kl_weight=kl_weight)
+        self.encoder = encoder_z(dim_z = dim_z, dim_x=dim_x ,kl_weight=1.0) #do weighting in trainstep
 
         self.decoder = decoder_x(dim_z = dim_z, dim_x=dim_x )
 
@@ -306,10 +306,14 @@ class K_PCVAE(tf.keras.Model):
             #loss = self.compute_loss(x)
             #cost_mini_batch = self.vae_cost(x)
             neg_log_lik = self.partial_vae_loss(x)
-            kl_loss_l = self.encoder.layers[-1] #self.encoder.kl_lossTFP.losses 
-            kl_loss = kl_loss_l.losses[-1]
+                   
+            kl_loss_l = self.encoder.get_layer('kl_loss') #self.encoder.kl_lossTFP.losses 
+            kl_loss= kl_loss_l.losses[-1]
+        
+            # kl_loss_l = self.encoder.layers[-1] #self.encoder.kl_lossTFP.losses 
+            # kl_loss = kl_loss_l.losses[-1]
             # make sure its the last entry in the list... 
-            total_vae_loss = neg_log_lik + kl_loss
+            total_vae_loss = neg_log_lik + self.kl_weight*kl_loss
 
 
         gradients = tape.gradient(total_vae_loss, self.trainable_variables)
@@ -321,7 +325,7 @@ class K_PCVAE(tf.keras.Model):
         self.elbo_tracker.update_state(total_vae_loss) 
         self.kl_mc.update_state(kl_loss)
         self.nll_tracker.update_state(neg_log_lik)
-        self.kl_analytic.update_state(kl_loss)
+        self.kl_analytic.update_state(kl_loss*self.kl_weight)
 
         return {m.name: m.result() for m in self.metrics}
 
@@ -331,14 +335,17 @@ class K_PCVAE(tf.keras.Model):
         if isinstance(x, tuple):  # should always be
             x = x[0]
         neg_log_lik = self.partial_vae_loss(x)
-        kl_loss_l = self.encoder.layers[-1] #self.encoder.kl_lossTFP.losses 
-        kl_loss = kl_loss_l.losses[-1]
+
+        kl_loss_l = self.encoder.get_layer('kl_loss') #self.encoder.kl_lossTFP.losses 
+        kl_loss= kl_loss_l.losses[-1]
+        # kl_loss_l = self.encoder.layers[-1] #self.encoder.kl_lossTFP.losses 
+        # kl_loss = kl_loss_l.losses[-1]
         total_vae_loss = neg_log_lik + kl_loss
 
         self.elbo_tracker.update_state(total_vae_loss) 
         self.kl_mc.update_state(kl_loss)
         self.nll_tracker.update_state(neg_log_lik)
-        self.kl_analytic.update_state(kl_loss)
+        self.kl_analytic.update_state(kl_loss*self.kl_weight)
 
         return {m.name: m.result() for m in self.metrics}
     
@@ -381,10 +388,10 @@ class K_PCVAE_KL_Reg(tf.keras.Model):
         self.encoder = encoder_z_KL_reg(dim_z=self.dim_z, dim_x=self.dim_x, kl_weight=self.kl_weight)
         self.decoder = decoder_x(dim_z=self.dim_z, dim_x=self.dim_x)
 
-        self.elbo_tracker = tf.keras.metrics.Mean(name="elbo")
-        self.kl_mc= tf.keras.metrics.Mean(name="kl")
-        self.nll_tracker = tf.keras.metrics.Mean(name="nll")
-        self.kl_analytic = tf.keras.metrics.Mean(name="kla")
+        # self.elbo_tracker = tf.keras.metrics.Mean(name="elbo")
+        self.kl_reg= tf.keras.metrics.Mean(name="kl_reg")
+        # self.nll_tracker = tf.keras.metrics.Mean(name="nll")
+        self.kl_reg1 = tf.keras.metrics.Mean(name="kl_reg1")
 
     # def encode_and_decode(self, x_input):
     def call(self, x_input):
@@ -396,24 +403,32 @@ class K_PCVAE_KL_Reg(tf.keras.Model):
 
     # vae loss function -- only the negative log-likelihood part,
     # since we use add_loss for the KL divergence part
-    def partial_vae_loss(self, x_true):
+    def partial_vae_loss(self, x_true,x_pred):
         # x_recons_logits = model.encode_and_decode(x_true)
-        z = self.encoder(x_true)
-        x_logits = self.decoder(z)
-        # compute cross entropy loss for each dimension of every datapoint
-        # change this to MSE
-        mse = tf.math.squared_difference(tf.keras.activations.sigmoid(x_logits), x_true)
+        mse = tf.math.squared_difference(x_pred, x_true)
+        # z = self.encoder(x_true)
+        # x_logits = self.decoder(z)
+        # # compute cross entropy loss for each dimension of every datapoint
+        # # change this to MSE
+        # mse = tf.math.squared_difference(tf.keras.activations.sigmoid(x_logits), x_true)
         neg_log_likelihood = tf.math.reduce_sum(mse, axis=[1, 2, 3])
         return tf.math.reduce_mean(neg_log_likelihood)
 
-    @tf.function
+    #@tf.function
     def train_step(self, x):
         if isinstance(x, tuple):  # should always be
             x = x[0]
         with tf.GradientTape() as tape:
+            y = x
+            y_pred = self(x, training=True)  # Forward pass
+            
+            # Compute the loss value
+            # (the loss function is configured in `compile()`)
+            neg_log_lik = self.compiled_loss(y, y_pred, regularization_losses=self.losses)
+
             #loss = self.compute_loss(x)
             #cost_mini_batch = self.vae_cost(x)
-            neg_log_lik = self.partial_vae_loss(x)
+            # neg_log_lik = self.partial_vae_loss(x)
 
         gradients = tape.gradient(neg_log_lik, self.trainable_variables)
         #gradients = tape.gradient(loss, self.trainable_variables)
@@ -421,15 +436,45 @@ class K_PCVAE_KL_Reg(tf.keras.Model):
         # return cost_mini_batch # loss
         # Compute our own metrics    
 
-        return neg_log_lik
+        kl_loss_l = self.encoder.get_layer('z_layer') #self.encoder.kl_lossTFP.losses 
+        kl_reg = kl_loss_l.losses[0]
+        kl_reg1 = kl_loss_l.losses[1]
+        
+        self.kl_reg.update_state(kl_reg)
+        self.kl_reg1.update_state(kl_reg1)
+
+        self.compiled_metrics.update_state(y, y_pred)
+        # Return a dict mapping metric names to current value
+        return {m.name: m.result() for m in self.metrics}
+
+        #return neg_log_lik
 
     #@tf.function
     def test_step(self, x):        
         if isinstance(x, tuple):  # should always be
             x = x[0]
-        neg_log_lik = self.partial_vae_loss(x)
 
-        return neg_log_lik
+        y = x
+        y_pred = self(x, training=True)  # Forward pass
+        
+        # Compute the loss value
+        # (the loss function is configured in `compile()`)
+        neg_log_lik = self.compiled_loss(y, y_pred, regularization_losses=self.losses)
+        # neg_log_lik = self.partial_vae_loss(x)
+
+        kl_loss_l = self.encoder.get_layer('z_layer') #self.encoder.kl_lossTFP.losses 
+        kl_reg = kl_loss_l.losses[0]
+        kl_reg1 = kl_loss_l.losses[1]
+        
+        self.kl_reg.update_state(kl_reg)
+        self.kl_reg1.update_state(kl_reg1)
+
+
+        self.compiled_metrics.update_state(y, y_pred)
+        # Return a dict mapping metric names to current value
+        return {m.name: m.result() for m in self.metrics}
+
+        #return neg_log_lik
     
     def save_model(self, dir_path, epoch):
         self.encoder.save_weights(os.path.join(dir_path, "enc_epoch_{}.h5".format(epoch)))
