@@ -116,21 +116,16 @@ x = test_samples
 #%%
 
 
-#%%
-model = kcv.K_PCVAE_KL_Reg
-model_name = "K_PCVAE_KL_Reg"
-data_dir = f"{model_name}-X{params['x_dim'][0]}-Z{params['z_dim']}"
-epochs = 500
 def overtrain_vae(model, model_name, data_dir,params, epochs):
     make_dir(data_dir)
     
     vae = model(dim_z=params['z_dim'], dim_x=params['x_dim'], 
                  learning_rate=0.0001, kl_weight=params['kl_weight'])
-
-    vae.compile(optimizer=vae.optimizer, loss = vae.partial_vae_loss)
+    loss = vae.partial_vae_loss
+    vae.compile(optimizer=vae.optimizer, loss = loss)
 
     train_history = vae.fit(train_dataset,epochs=epochs, 
-                            verbose=0, validation_data=test_dataset)
+                            verbose=1, validation_data=test_dataset)
                             #, initial_epoch = 11 )
 
     history = train_history.history
@@ -149,41 +144,58 @@ def overtrain_vae(model, model_name, data_dir,params, epochs):
 #%%
 #overtrain_vae(model, model_name, data_dir,params,epochs)
 
+# %%
+model = kcv.K_PCVAE
+model_name = "K_PCVAE"
+data_dir = f"{model_name}-X{params['x_dim'][0]}-Z{params['z_dim']}"
+
+
+latent_dim = 24
+pix_dim = 160
+batch_size = 64
+epochs = 200
+kl_weight = 4
+params['kl_weight'] = kl_weight
+params['z_dim'] = latent_dim
+print(f"training beta={kl_weight} z={latent_dim}")
+data_dir = f"{model_name}-X{params['x_dim'][0]}-Z{params['z_dim']}"
+print(data_dir)
+overtrain_vae(model, model_name, data_dir,params,epochs)
+print("trained")
+
+
+
+
+
+
+# %%
+
+# %%
+model = kcv.K_PCVAE
+model_name = "K_PCVAE"
+data_dir = f"{model_name}-X{params['x_dim'][0]}-Z{params['z_dim']}"
+
+
+pix_dim = 160
+batch_size = 64
+epochs = 400
+kl_weight = 5
+latent_dim = 40
+
+
+params['kl_weight'] = kl_weight
+params['z_dim'] = latent_dim
+
+print(f"training beta={kl_weight} z={latent_dim}")
+data_dir = f"{model_name}-X{params['x_dim'][0]}-Z{params['z_dim']}"
+print(data_dir)
+
 
 model = kcv.K_PCVAE
 model_name = "K_PCVAE"
 data_dir = f"{model_name}-X{params['x_dim'][0]}-Z{params['z_dim']}"
-#overtrain_vae(model, model_name, data_dir,params,epochs)
-
-# %%
-
-latent_dim = 40
-pix_dim = 160
-batch_size = 64
-epochs = 100
-kl_weight = 5
-
-klws = [1,2,3,5,10]
-latents = [32,40,64]
-epochs = 400
 
 
-for kl in klws:
-    params['kl_weight'] = kl
-    for l in latents:
-        params['z_dim'] = l
-        print(f"training beta={kl} z={l}")
-        data_dir = f"{model_name}-X{params['x_dim'][0]}-Z{params['z_dim']}"
-        print(data_dir)
-        overtrain_vae(model, model_name, data_dir,params,epochs)
-        print("trained")
-
-
-
-
-
-
-# %%
 filename = f"overtrain-{model_name}-kl_weight{params['kl_weight']:03d}.pkl"    
 history,params = ut.load_pickle(os.path.join(data_dir,filename))
 
@@ -209,4 +221,80 @@ tf.math.squared_difference(x,xhat).numpy().mean()
 xhat.numpy().min()
 # %%
 plt.imshow(xhat[0,].numpy().squeeze())
+# %%
+
+
+
+#%% Run model on all data to get latent vects and loss. Used for streamlit app and other places.
+#preds,losses = ut.dumpReconstruct( model, train_dataset, test_dataset )
+ds = ut.load_and_dump(pix_dim, cf.IMAGE_FILEPATH)
+#or _samples, _labels in ds.take(1) : pass
+# remake this to simply go through all the data and calculate the embedding and loss... new functions probably...
+#%%count our n
+n_samples = 0
+for _ in ds :
+    n_samples += 1
+#%% dump the vectors to a dictionary
+
+# snk2loss = {}
+# snk2vec = {}
+# for sample, label in tqdm(ds, 
+#                             unit_scale=True, 
+#                             desc="Saving shape 2 vec: ", 
+#                             unit=" encodes", 
+#                             total=n_samples ) :
+#     #sample = tf.cast(sample, dtype=tf.float32)
+#     key = label.numpy()  # maybe should have changed this to a (string... but byte is good...
+#     snk2vec[key] = vae.encoder(sample[None,...]).sample().numpy()[0]
+#     snk2loss[key] = vae.partial_vae_loss(sample[None,...]).numpy()
+
+# ut.dump_pickle(os.path.join(data_dir,"snk2vec.pkl"), snk2vec)
+# ut.dump_pickle(os.path.join(data_dir,"snk2loss.pkl"), snk2loss)
+
+
+snk2vec = ut.load_pickle(os.path.join(data_dir,"snk2vec.pkl"))
+usnk2loss = t.load_pickle(os.path.join(data_dir,"snk2loss.pkl"))
+
+# %%
+
+import matplotlib.pyplot as plt
+import seaborn as sns
+import pandas as pd
+import umap
+
+
+
+digits_df = pd.DataFrame.from_dict(snk2vec, orient='index')
+
+#%%
+sns.pairplot(digits_df, hue='digit', palette='Spectral')
+
+
+reducer = umap.UMAP(random_state=42)
+reducer.fit(digits_df.to_numpy())
+
+# UMAP(a=None, angular_rp_forest=False, b=None,
+#      force_approximation_algorithm=False, init='spectral', learning_rate=1.0,
+#      local_connectivity=1.0, low_memory=False, metric='euclidean',
+#      metric_kwds=None, min_dist=0.1, n_components=2, n_epochs=None,
+#      n_neighbors=15, negative_sample_rate=5, output_metric='euclidean',
+#      output_metric_kwds=None, random_state=42, repulsion_strength=1.0,
+#      set_op_mix_ratio=1.0, spread=1.0, target_metric='categorical',
+#      target_metric_kwds=None, target_n_neighbors=-1, target_weight=0.5,
+#      transform_queue_size=4.0, transform_seed=42, unique=False, verbose=False)
+
+
+
+
+embedding = reducer.transform(digits_df.to_numpy())
+# Verify that the result of calling transform is
+# idenitical to accessing the embedding_ attribute
+assert(np.all(embedding == reducer.embedding_))
+embedding.shape
+
+plt.scatter(embedding[:, 0], embedding[:, 1], c=digits.target, cmap='Spectral', s=5)
+plt.gca().set_aspect('equal', 'datalim')
+plt.colorbar(boundaries=np.arange(11)-0.5).set_ticks(np.arange(10))
+plt.title('UMAP projection of the Digits dataset', fontsize=24);
+
 # %%
