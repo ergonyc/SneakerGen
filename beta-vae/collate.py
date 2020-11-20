@@ -179,7 +179,7 @@ def get_umap_embedding(snk2vec):
 # model_name = "K_PCVAE"
 # epochs = 400
 
-# data_dir = f"{model_name}-X{params['x_dim'][0]}-Z{params['z_dim']}"
+# data_dir = f"data/{model_name}-X{params['x_dim'][0]}-Z{params['z_dim']}"
 # vae,hist = load_and_prime_model(model,model_name,params,data_dir,epochs)
 
 # make_dicts = False
@@ -230,7 +230,7 @@ for model,model_name in zip(models,model_names):
         for l in latents:
 
             params['z_dim'] = l
-            data_dir = f"{model_name}-X{params['x_dim'][0]}-Z{params['z_dim']}"
+            data_dir = f"data/{model_name}-X{params['x_dim'][0]}-Z{params['z_dim']}"
             print(data_dir)
 
             vae, hist = load_and_prime_model(model,model_name,params,data_dir,epochs)
@@ -273,7 +273,7 @@ for pix_dim in pix_dims:
         for l in latent_dims:
 
             params['z_dim'] = l
-            data_dir = f"{model_name}-X{params['x_dim'][0]}-Z{params['z_dim']}"
+            data_dir = f"data/{model_name}-X{params['x_dim'][0]}-Z{params['z_dim']}"
             print(data_dir)
 
             vae,hist = load_and_prime_model(model,model_name,params,data_dir,epochs)
@@ -318,7 +318,7 @@ kl = klws[4]
 params['kl_weight'] = kl
 l = latent_dims[2]
 params['z_dim'] = l
-data_dir = f"{model_name}-X{params['x_dim'][0]}-Z{params['z_dim']}"
+data_dir = f"data/{model_name}-X{params['x_dim'][0]}-Z{params['z_dim']}"
 print(data_dir)
 #vae,hist = load_and_prime_model(model,model_name,params,data_dir,epochs)
 
@@ -408,7 +408,7 @@ for model,model_name in zip(models,model_names):
         params['kl_weight'] = kl
         for l in latents:
             params['z_dim'] = l
-            data_dir = f"{model_name}-X{params['x_dim'][0]}-Z{params['z_dim']}"
+            data_dir = f"data/{model_name}-X{params['x_dim'][0]}-Z{params['z_dim']}"
             print(data_dir)
             # vae, hist = load_and_prime_model(model,model_name,params,data_dir,epochs)
             # snk2loss,snk2vec = create_snk2dicts(ds,n_samples,vae)
@@ -441,7 +441,7 @@ for pix_dim in pix_dims:
         params['kl_weight'] = kl
         for l in latent_dims:
             params['z_dim'] = l
-            data_dir = f"{model_name}-X{params['x_dim'][0]}-Z{params['z_dim']}"
+            data_dir = f"data/{model_name}-X{params['x_dim'][0]}-Z{params['z_dim']}"
             print(data_dir)
             # vae, hist = load_and_prime_model(model,model_name,params,data_dir,epochs)
             # snk2loss,snk2vec = create_snk2dicts(ds,n_samples,vae)
@@ -608,12 +608,12 @@ params['kl_weight'] = kl_weight
 params['z_dim'] = latent_dim
 
 print(f"training beta={kl_weight} z={latent_dim}")
-data_dir = f"{model_name}-X{params['x_dim'][0]}-Z{params['z_dim']}"
+data_dir = f"data/{model_name}-X{params['x_dim'][0]}-Z{params['z_dim']}"
 print(data_dir)
 
 model = kcv.K_PCVAE
 model_name = "K_PCVAE"
-data_dir = f"{model_name}-X{params['x_dim'][0]}-Z{params['z_dim']}"
+data_dir = f"data/{model_name}-X{params['x_dim'][0]}-Z{params['z_dim']}"
 
 filename = f"overtrain-{model_name}-kl_weight{params['kl_weight']:03d}.pkl"    
 history,params = ut.load_pickle(os.path.join(data_dir,filename))

@@ -147,7 +147,7 @@ def overtrain_vae(model, model_name, data_dir,params, epochs):
 # %%
 model = kcv.K_PCVAE
 model_name = "K_PCVAE"
-data_dir = f"{model_name}-X{params['x_dim'][0]}-Z{params['z_dim']}"
+data_dir = f"data/{model_name}-X{params['x_dim'][0]}-Z{params['z_dim']}"
 
 
 latent_dim = 24
@@ -158,7 +158,7 @@ kl_weight = 4
 params['kl_weight'] = kl_weight
 params['z_dim'] = latent_dim
 print(f"training beta={kl_weight} z={latent_dim}")
-data_dir = f"{model_name}-X{params['x_dim'][0]}-Z{params['z_dim']}"
+data_dir = f"data/{model_name}-X{params['x_dim'][0]}-Z{params['z_dim']}"
 print(data_dir)
 overtrain_vae(model, model_name, data_dir,params,epochs)
 print("trained")
@@ -173,7 +173,7 @@ print("trained")
 # %%
 model = kcv.K_PCVAE
 model_name = "K_PCVAE"
-data_dir = f"{model_name}-X{params['x_dim'][0]}-Z{params['z_dim']}"
+data_dir = f"data/{model_name}-X{params['x_dim'][0]}-Z{params['z_dim']}"
 
 
 pix_dim = 160
@@ -187,13 +187,13 @@ params['kl_weight'] = kl_weight
 params['z_dim'] = latent_dim
 
 print(f"training beta={kl_weight} z={latent_dim}")
-data_dir = f"{model_name}-X{params['x_dim'][0]}-Z{params['z_dim']}"
+data_dir = f"data/{model_name}-X{params['x_dim'][0]}-Z{params['z_dim']}"
 print(data_dir)
 
 
 model = kcv.K_PCVAE
 model_name = "K_PCVAE"
-data_dir = f"{model_name}-X{params['x_dim'][0]}-Z{params['z_dim']}"
+data_dir = f"data/{model_name}-X{params['x_dim'][0]}-Z{params['z_dim']}"
 
 
 filename = f"overtrain-{model_name}-kl_weight{params['kl_weight']:03d}.pkl"    

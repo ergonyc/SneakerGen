@@ -119,7 +119,7 @@ x = test_samples
 #%%
 model = kcv.K_PCVAE_KL_Reg
 model_name = "K_PCVAE_KL_Reg"
-data_dir = f"{model_name}-X{params['x_dim'][0]}-Z{params['z_dim']}"
+data_dir = f"data/{model_name}-X{params['x_dim'][0]}-Z{params['z_dim']}"
 epochs = 500
 
 def overtrain_vae(model, model_name, data_dir,params, epochs):
@@ -153,7 +153,7 @@ def overtrain_vae(model, model_name, data_dir,params, epochs):
 
 model = kcv.K_PCVAE
 model_name = "K_PCVAE"
-data_dir = f"{model_name}-X{params['x_dim'][0]}-Z{params['z_dim']}"
+data_dir = f"data/{model_name}-X{params['x_dim'][0]}-Z{params['z_dim']}"
 #overtrain_vae(model, model_name, data_dir,params,epochs)
 
 # %%
@@ -174,7 +174,7 @@ for kl in klws:
     for l in latents:
         params['z_dim'] = l
         print(f"training beta={kl} z={l}")
-        data_dir = f"{model_name}-X{params['x_dim'][0]}-Z{params['z_dim']}"
+        data_dir = f"data/{model_name}-X{params['x_dim'][0]}-Z{params['z_dim']}"
         print(data_dir)
         overtrain_vae(model, model_name, data_dir,params,epochs)
         print("trained")
@@ -186,7 +186,7 @@ for kl in klws:
 
 model = kcv.K_PCVAE_KL_Reg
 model_name = "K_PCVAE_KL_Reg"
-data_dir = f"{model_name}-X{params['x_dim'][0]}-Z{params['z_dim']}"
+data_dir = f"data/{model_name}-X{params['x_dim'][0]}-Z{params['z_dim']}"
 #overtrain_vae(model, model_name, data_dir,params,epochs)
 
 latent_dim = 40
@@ -207,7 +207,7 @@ for kl in klws:
     for l in latents:
         params['z_dim'] = l
         print(f"training beta={kl} z={l}")
-        data_dir = f"{model_name}-X{params['x_dim'][0]}-Z{params['z_dim']}"
+        data_dir = f"data/{model_name}-X{params['x_dim'][0]}-Z{params['z_dim']}"
         print(data_dir)
         overtrain_vae(model, model_name, data_dir,params,epochs)
         print("trained")
@@ -258,7 +258,7 @@ for pdim in pix_dims:
         for l in latents:
             params['z_dim'] = l
             print(f"training beta={kl} z={l}, x={pdim}")
-            data_dir = f"{model_name}-X{params['x_dim'][0]}-Z{params['z_dim']}"
+            data_dir = f"data/{model_name}-X{params['x_dim'][0]}-Z{params['z_dim']}"
             print(data_dir)
             overtrain_vae(model, model_name, data_dir,params,epochs)
             print("trained")
