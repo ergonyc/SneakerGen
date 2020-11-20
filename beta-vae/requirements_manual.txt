@@ -1,7 +1,9 @@
 
 pandas
 tensorflow
-tensorflow-probability
+pip install --upgrade tensorflow-probability 
 streamlit
 umap-learn
 bokeh
+tqdm
+matplotlib
