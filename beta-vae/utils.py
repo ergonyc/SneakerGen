@@ -30,6 +30,7 @@ import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 
+from PIL import Image
 # import plotly.graph_objects as go
 # from plotly.offline import plot
 # import plotly.figure_factory as FF
@@ -136,7 +137,23 @@ def add_time_stamp(path=""):
 
 def get_sub_dirs(a_dir):
     return [name for name in os.listdir(a_dir) if os.path.isdir(os.path.join(a_dir, name))]
+##############################################
+##############################################
+##############################################
 
+
+# def get_JSON(json_fp, df=False):
+#     if df:
+#         json_file = pd.read_json(json_fp)
+#     else:
+#         with open(json_fp, "r") as json_file:
+#             json_file = json.load(json_file)
+#     return json_file
+
+
+# def read_meta():
+#     meta = pd.read_csv(cf.META_DATA_CSV)
+#     return meta
 
 ##############################################
 ##############################################
@@ -155,7 +172,7 @@ def parse_function(filename, label):
     return resized_image, label
 
 
-def zoom_in(image, zoomf, pad_value=1.0):
+def zoom_in(image, zoomf, pad_value=0.9524701):
     # returns a square image the size of the inital width
     shape_f = tf.cast(tf.shape(image), tf.float32)
 
@@ -181,13 +198,39 @@ def zoom_in(image, zoomf, pad_value=1.0):
     return image
 
 
+# def load_and_convert(filename):
+#     if tf.io.is_jpeg(filename):
+#         image_string = tf.io.read_file(filename)
+#         im = tf.image.decode_jpeg(image_string, channels=3)
+#     else:
+#         image_string = Image.open(filename)
+#         im = tf.keras.preprocessing.image.img_to_array(image_string)
+
+#     #i.thumbnail((64, 64), Image.LANCZOS)
+#     label = filename
+#     return tf.cast(im, tf.float32) / 255.0, label
+
 def load_and_convert(filename):
     image_string = tf.io.read_file(filename)
     im = tf.image.decode_jpeg(image_string, channels=3)
-
     label = filename
     return tf.cast(im, tf.float32) / 255.0, label
+    
+    # if tf.io.is_jpeg(filename):
+    #     image_string = tf.io.read_file(filename)
+    #     im = tf.image.decode_jpeg(image_string, channels=3)
+    #     im = tf.cast(im, tf.float32) / 255.0
+    # else: 
+    #     #print("not a jpeg")
+    #     image_string = tf.io.read_file(filename)
+    #     im = tf.image.decode_png(image_string, channels=0)  #  
+    #     mask = tf.cast(tf.expand_dims(im[:,:,3],2),tf.float32) / 255.
+    #     mask2 = tf.concat((mask,mask,mask),axis=2)
+    #     im = tf.cast(im, tf.float32) / 255.0
+    #     im = (1.-mask2) + mask2*im[:,:,0:3]
 
+    # label = filename
+    # return im, label
 
 def load_square_and_augment(filename, img_size=64):
 
@@ -195,7 +238,8 @@ def load_square_and_augment(filename, img_size=64):
 
     # ZOOMS between 100 and 110
     zoomf = tf.random.uniform(shape=[1], minval=100, maxval=110)
-    pad_value = 1.0
+    pad_value = 1.0 # 0.9543486 
+    #pad_value = image[0]
 
     shape_f = tf.cast(tf.shape(image), tf.float32)
     shape_f = tf.cast(tf.shape(image), tf.float32)
@@ -450,24 +494,6 @@ def load_and_prep_data2(file_list, img_size, batch_size, augment=True):
     return dataset
 
 
-##############################################
-##############################################
-##############################################
-
-
-def get_JSON(json_fp, df=False):
-    if df:
-        json_file = pd.read_json(json_fp)
-    else:
-        with open(json_fp, "r") as json_file:
-            json_file = json.load(json_file)
-    return json_file
-
-
-def read_meta():
-    global meta
-    meta = pd.read_csv(cf.META_DATA_CSV)
-    return meta
 
 
 #%% 3D Model Functions
@@ -725,6 +751,30 @@ def dump_reconstruct(model, samples, test_samples):
 def start_streamlit(filepath):
     subprocess.call("streamlit run {}".format(filepath), shell=True)
     subprocess.call("firefox new-tab http://localhost:8501/")
+
+
+
+
+def load_snk2pickles(data_dir,kl_weight):
+    load_dir = os.path.join(data_dir,f"kl_weight{kl_weight:03d}")
+    snk2vec = load_pickle(os.path.join(load_dir,"snk2vec.pkl"))
+    snk2loss = load_pickle(os.path.join(load_dir,"snk2loss.pkl"))
+    return snk2loss, snk2vec 
+
+def dump_snk2pickles(snk2loss,snk2vec,data_dir,kl_weight):
+    load_dir = os.path.join(data_dir,f"kl_weight{kl_weight:03d}")
+    dump_pickle(os.path.join(load_dir,"snk2vec.pkl"), snk2vec)
+    dump_pickle(os.path.join(load_dir,"snk2loss.pkl"), snk2loss)
+
+
+def load_snk2umap(data_dir,kl_weight):
+    load_dir = os.path.join(data_dir,f"kl_weight{kl_weight:03d}")
+    umap = load_pickle(os.path.join(load_dir,"snk2umap.pkl"))
+    return snk2loss, snk2vec 
+
+def dump_snk2umap(snk2umap,data_dir,kl_weight):
+    load_dir = os.path.join(data_dir,f"kl_weight{kl_weight:03d}")
+    dump_pickle(os.path.join(load_dir,"snk2umap.pkl"), snk2umap)
 
 
 #%% For plotting meshes side by side

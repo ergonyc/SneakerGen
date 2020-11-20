@@ -36,15 +36,16 @@ HOME = os.environ.get("HOME")
 
 
 if REMOTE:  # Running on EC2 instance or similar
-    META_DATA_CSV = "/data/sn/all/meta/dfmeta.csv"
+    META_DATA = "/data/sn/all/meta/dfmeta"
     VOXEL_FILEPATH = "/data/sn/all/all/"
     IMGRUN_DIR = "/data/sn/all/runs/"
     TXTRUN_DIR = "/data/sn/all/txtruns/"
     DATA_DIR = "/data/sn/all/data/"
 
 else:  # Running locally
-    META_DATA_CSV = HOME + "/Projects/DATABASE/SnkrScrpr/data/basic_data_raw.csv"
-
+    META_DATA = HOME + "/Projects/DATABASE/SnkrScrpr/data/full_data"  # csv pickle and json 
+    DESCRIPTIONS = HOME + "/Projects/DATABASE/SnkrScrpr/data/basic_data_clean"
+    
     """
     This is the directory file that stores all of the metadata information gathered and analyzed by the program to generate descriptions.
     It is made by the program and shouldn't require additional action but is a useful resource to inspect manually    

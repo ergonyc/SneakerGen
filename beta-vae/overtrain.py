@@ -209,19 +209,19 @@ vae.load_model(sv_path, epochs)
 
 
 
-# %%
-x
-# %%
-x.shape
-# %%
-xhat = vae(x)
-# %%
-tf.math.squared_difference(x,xhat).numpy().mean()
-# %%
-xhat.numpy().min()
-# %%
-plt.imshow(xhat[0,].numpy().squeeze())
-# %%
+# # %%
+# x
+# # %%
+# x.shape
+# # %%
+# xhat = vae(x)
+# # %%
+# tf.math.squared_difference(x,xhat).numpy().mean()
+# # %%
+# xhat.numpy().min()
+# # %%
+# plt.imshow(xhat[0,].numpy().squeeze())
+# # %%
 
 
 
@@ -235,25 +235,29 @@ n_samples = 0
 for _ in ds :
     n_samples += 1
 #%% dump the vectors to a dictionary
+make_dicts = False
+if make_dicts:
 
-# snk2loss = {}
-# snk2vec = {}
-# for sample, label in tqdm(ds, 
-#                             unit_scale=True, 
-#                             desc="Saving shape 2 vec: ", 
-#                             unit=" encodes", 
-#                             total=n_samples ) :
-#     #sample = tf.cast(sample, dtype=tf.float32)
-#     key = label.numpy()  # maybe should have changed this to a (string... but byte is good...
-#     snk2vec[key] = vae.encoder(sample[None,...]).sample().numpy()[0]
-#     snk2loss[key] = vae.partial_vae_loss(sample[None,...]).numpy()
-
-# ut.dump_pickle(os.path.join(data_dir,"snk2vec.pkl"), snk2vec)
-# ut.dump_pickle(os.path.join(data_dir,"snk2loss.pkl"), snk2loss)
+    snk2loss = {}
+    snk2vec = {}
+    for sample, label in tqdm(ds, 
+                                unit_scale=True, 
+                                desc="Saving shape 2 vec: ", 
+                                unit=" encodes", 
+                                total=n_samples ) :
+        #sample = tf.cast(sample, dtype=tf.float32)
+        key = label.numpy()  # maybe should have changed this to a (string... but byte is good...
+        snk2vec[key] = vae.encoder(sample[None,...]).sample().numpy()[0]
+        snk2loss[key] = vae.partial_vae_loss(sample[None,...]).numpy()
 
 
-snk2vec = ut.load_pickle(os.path.join(data_dir,"snk2vec.pkl"))
-usnk2loss = t.load_pickle(os.path.join(data_dir,"snk2loss.pkl"))
+
+    ut.dump_pickle(os.path.join(data_dir,"snk2vec.pkl"), snk2vec)
+    ut.dump_pickle(os.path.join(data_dir,"snk2loss.pkl"), snk2loss)
+
+else:
+    snk2vec = ut.load_pickle(os.path.join(data_dir,"snk2vec.pkl"))
+    snk2loss = ut.load_pickle(os.path.join(data_dir,"snk2loss.pkl"))
 
 # %%
 
@@ -262,6 +266,11 @@ import seaborn as sns
 import pandas as pd
 import umap
 
+
+
+dfdesc = pd.read_csv(cf.DESCRIPTIONS_CSV)
+df_meta = pd.read_csv(cf.META_DATA_CSV)
+# fix the root directory....
 
 
 digits_df = pd.DataFrame.from_dict(snk2vec, orient='index')

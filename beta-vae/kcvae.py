@@ -403,8 +403,10 @@ class K_PCVAE_KL_Reg(tf.keras.Model):
 
     # vae loss function -- only the negative log-likelihood part,
     # since we use add_loss for the KL divergence part
-    def partial_vae_loss(self, x_true,x_pred):
+    def partial_vae_loss(self, x_true,x_pred=None):
         # x_recons_logits = model.encode_and_decode(x_true)
+        if x_pred is None:
+            x_pred = self(x_true)
         mse = tf.math.squared_difference(x_pred, x_true)
         # z = self.encoder(x_true)
         # x_logits = self.decoder(z)

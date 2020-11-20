@@ -24,9 +24,6 @@ import configs as cf
 from PIL import Image
 
 
-OUTPUT_2D_TSNE = "df_sl_2dTSNE.csv"
-OUTPUT_3D_TSNE = "df_sl_3dTSNE.csv"
-
 OUTPUT_2D_UMAP = "df_sl_2dUMAP.csv"
 OUTPUT_3D_UMAP = "df_sl_3dUMAP.csv"
 
@@ -37,6 +34,67 @@ run_root_dir = os.path.join(cf.IMG_RUN_DIR, shape_run_id)
 
 snk2vec = ut.loadPickle(os.path.join(run_root_dir, "snk2vec.pkl"))
 snk2loss = ut.loadPickle(os.path.join(run_root_dir, "snk2loss.pkl"))
+
+
+
+
+#%% Encoding methods
+def get_embeddings(vocab):
+    lexemes = [vocab[orth] for orth in vocab.vectors]  # changed in spacy v2.3...
+    max_rank = max(lex.rank for lex in lexemes)
+    vectors = np.zeros((max_rank + 1, vocab.vectors_length), dtype="float32")
+    for lex in lexemes:
+        if lex.has_vector:
+            vectors[lex.rank] = lex.vector
+    return vectors
+embeddings = get_embeddings(nlp.vocab)
+
+def padEnc(text):
+    texts = text if type(text) == list else [text]
+
+    # probably can do some sort of walrus here...
+    lexs = [[nlp.vocab[t] for t in sent.replace(".", " . ").split(" ") if len(t) > 0] for sent in texts]
+    ranks = [[l.rank for l in lex if not l.is_oov] for lex in lexs]
+
+    # ranks = [
+    #     [t if t != 18446744073709551615 else 0 for t in rank] for rank in ranks
+    # ]  # just change overflow to zero...
+    padded = pad_sequences(ranks, maxlen=cf_max_length, padding=cf_padding_type, truncating=cf_trunc_type)
+    return padded
+
+
+# #%% Get a list of all mids and descs and latent vectors
+save_template = cf.DATA_DIR + "/{}.npy"
+alldnp = np.load(save_template.format("alldnp"))
+mids = list(alldnp[:, 0])
+# TODO:  fix this hack... the alldnp file should be easier to move ROOT directories...
+# probably make relative and 
+all_mids = [m.replace("Users","home") for m in mids]  #fix for linux vs OSX
+all_descs = list(alldnp[:, 1])
+all_pdescs = list(padEnc(all_descs))
+
+#%% Filter out any data that is not present in shape2vec and stack it into np arrays
+not_found_count = 0
+mids, descs, vects, padenc = [], [], [], []
+for mid, desc, pdesc in tqdm(zip(all_mids, all_descs, all_pdescs), total=len(all_mids)):
+    mids.append(mid)
+    descs.append(desc)
+    vects.append(snk2vec[mid.encode()])
+    padenc.append(pdesc)
+
+mnp, dnp, vnp, pnp = np.stack(mids), np.stack(descs), np.stack(vects), np.stack(padenc)
+
+np.save(save_template.format("mnp"), mnp)
+np.save(save_template.format("dnp"), dnp)
+np.save(save_template.format("vnp"), vnp)
+np.save(save_template.format("pnp"), pnp)
+id_label = np.load(os.path.join(cf.DATA_DIR,'mnp.npy'))  #IDs (filenames)
+descriptions = np.load(os.path.join(cf.DATA_DIR,'dnp.npy')) #description
+description_vectors = np.load(os.path.join(cf.DATA_DIR,'vnp.npy')) #vectors encoded
+padded_encoded_vector = np.load(os.path.join(cf.DATA_DIR,'pnp.npy')) #padded encoded
+
+
+
 
 bright = [
     "#023EFF",

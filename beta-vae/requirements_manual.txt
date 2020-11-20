@@ -1,0 +1,7 @@
+
+pandas
+tensorflow
+tensorflow-probability
+streamlit
+umap-learn
+bokeh
