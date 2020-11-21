@@ -24,8 +24,8 @@ try:
     # import textspacy as ts   #from scipy import spatial
     # import skimage.measure as sm
     # import matplotlib.pyplot as pltmodel
-    # import matplotlib.image as mpimg
-    # import matplotlib.pyplot as plt
+    import matplotlib.image as mpimg
+    import matplotlib.pyplot as plt
     # from mpl_toolkits.mplot3d import Axes3D
     # import plotly
     # import plotly.express as px
@@ -43,7 +43,6 @@ try:
     import pandas as pd
     import random
     import pickle
-    import matplotlib.pyplot as plt
     # from tqdm import tqdm
     # import glob
     # import seaborn as sns
@@ -56,7 +55,9 @@ try:
     import tensorflow as tf
     AUTOTUNE = tf.data.experimental.AUTOTUNE
 
-
+    #from scipy import spatial  #for now just brute force to find neighbors
+    import scipy 
+    #from scipy.spatial import distance
 
     from io import BytesIO
     from PIL import Image
@@ -97,16 +98,26 @@ latent_dims = [32,40,64]
 pix_dims = [128,160,192]
 epochs = 400
 
-p_names = ['z_dim','x_dim','kl_weight','batch_size']
+
+# TODO: pack this into a simple class or add model/modelname to dictionary
+# set default model/params names
+
+
+model = models[0]
+model_name = model_names[0]
 
 p_vals = [cf_latent_dim, cf_pixel_dim, cf_kl_weight, cf_batch_size]
+p_names = ['z_dim','x_dim','kl_weight','batch_size']
 params = dict(zip(p_names,p_vals))
 
 
 #%%  are we GPU-ed?
 tf.config.experimental.list_physical_devices('GPU') 
 
-
+########################################3
+#  BOKEH
+#
+##########################################3
 def init_bokeh_plot(umap_df):
 
     bplt.output_notebook()
@@ -147,7 +158,31 @@ def init_bokeh_plot(umap_df):
     return plot_figure
 
 
+##  HELPERS
+def embeddable_image(label):
+    return image_formatter(label)
+
+
+def get_thumbnail(path):
+    i = Image.open(path)
+    i.thumbnail((64, 64), Image.LANCZOS)
+    return i
+
+def image_base64(im):
+    if isinstance(im, str):
+        im = get_thumbnail(im)
+    with BytesIO() as buffer:
+        im.save(buffer, 'png')
+        return base64.b64encode(buffer.getvalue()).decode()
+
+def image_formatter(im):
+    return f"data:image/png;base64,{image_base64(im)}"
+
+
+
+
 #%% Setup sub methods
+
 def set_widemode_hack():
     max_width_str = f"max-width: 2000px;"
     st.markdown(
@@ -155,42 +190,78 @@ def set_widemode_hack():
         unsafe_allow_html=True,
     )
 
+##
+
+def embeddable_image(label):
+    return image_formatter(label)
+
+def get_image(path):
+    i = Image.open(path)
+    i.thumbnail((256, 256), Image.LANCZOS)
+    return i
+
+
+def get_thumbnail(path):
+    i = Image.open(path)
+    i.thumbnail((64, 64), Image.LANCZOS)
+    return i
+
+def image_base64(im):
+    if isinstance(im, str):
+        im = get_thumbnail(im)
+    with BytesIO() as buffer:
+        im.save(buffer, 'png')
+        return base64.b64encode(buffer.getvalue()).decode()
+
+def image_formatter(im):
+    return f"data:image/png;base64,{image_base64(im)}"
+
+
+
 
 # do we need it loaded... it might be fast enough??
-@st.cache
+#@st.cache
 def load_UMAP_data():
     # params = ['z_dim','x_dim','kl_weight','batch_size']
     # params and "model_name" should be globally available
     # TODO: kill "params" and just load the kl, latents, xdim globals
-    data_dir = f"{model_name}-X{params['x_dim'][0]}-Z{params['z_dim']}"
+    data_dir = f"data/{model_name}-X{params['x_dim'][0]}-Z{params['z_dim']}"
     #vae,hist = load_and_prime_model(model,model_name,params,data_dir,epochs)
 
-    snk2umap = load_snk2umap(data_dir,params['kl_weight'])
+    #snk2umap = ut.load_snk2umap(data_dir,params['kl_weight'])
+    load_dir = os.path.join(data_dir,f"kl_weight{int(params['kl_weight']):03d}")
+    snk2umap = ut.load_pickle(os.path.join(load_dir,"snk2umap.pkl"))
+    
+
     return snk2umap
 
 # do we need it loaded... it might be fast enough??
-@st.cache
+#@st.cache
 def load_latent_data():
     # params = ['z_dim','x_dim','kl_weight','batch_size']
     # params and "model_name" should be globally available
     # TODO: kill "params" and just load the kl, latents, xdim globals
-    data_dir = f"{model_name}-X{params['x_dim'][0]}-Z{params['z_dim']}"
+    data_dir = f"data/{model_name}-X{params['x_dim'][0]}-Z{params['z_dim']}"
 
     snk2umap = load_UMAP_data()
     #vae,hist = load_and_prime_model(model,model_name,params,data_dir,epochs)
-    snk2loss, snk2vec = load_snk2pickles(data_dir,params['kl_weight'])
-    desc_df = pd.read_pickle(f"{cf.DESCRIPTIONS}.pkl")
-    meta_df = pd.read_pickle(f"{cf.META_DATA}.pkl")
+    snk2loss, snk2vec = ut.load_snk2pickles(data_dir,params['kl_weight'])
+    # desc_df = pd.read_pickle(f"{cf.DESCRIPTIONS}.pkl")
+    # meta_df = pd.read_pickle(f"{cf.META_DATA}.pkl")
+
+    mids = list(snk2vec.keys())
+    vecs = np.array([snk2vec[m] for m in mids])
+    vec_tree = scipy.spatial.KDTree(vecs)
 
 
     latents = np.array(list(snk2vec.values()))
     losses = np.array(list(snk2loss.values()))
-    labels = np.array(list(snk2vec.keys()))
+    labels = np.array(mids)
 
-    labels2 = np.array(list(snk2vec.keys()))
-    embedding = np.array(list(snk2vec.values()))
+    labels2 = np.array(list(snk2umap.keys()))
+    embedding = np.array(list(snk2umap.values()))
 
-    assert(labels == labels2)    
+    assert(np.all(labels == labels2))    
     umap_df = pd.DataFrame(embedding, columns=('x', 'y'))
 
     umap_df['digit'] = [str(x.decode()) for x in labels]
@@ -199,7 +270,7 @@ def load_latent_data():
     umap_df['db'] = umap_df.digit.map(lambda x: f"{x.split('/')[-3]}")
     umap_df['loss'] = [f"{x:.1f}" for x in losses]
 
-    return umap_df
+    return umap_df,snk2vec,latents, labels, vecs,vec_tree,mids
 
 
 #%%
@@ -207,45 +278,30 @@ def load_latent_data():
 
 
 # @st.cache
-# def loadExampleDescriptions():
-#     example_descriptions = np.load(os.path.join(os.getcwd(), "data/exdnp.npy"))  #line 544 text2snk.py
-#     return list(example_descriptions)
+def loadExampleDescriptions():
+    #example_descriptions = np.load(os.path.join(os.getcwd(), "data/exdnp.npy"))  #line 544 text2snk.py
+    desc_df = pd.read_pickle(f"{cf.DESCRIPTIONS}.pkl")
+    example_descriptions = desc_df.description.to_numpy()
+    return list(example_descriptions)
 
 
+# @st.cache(allow_output_mutation=True)
+def make_text_model():
+    # model_in_dir = os.path.join(os.getcwd(), "models/textencoder")
+    # textmodel = ts.TextSpacy(cf_latent_dim, max_length=cf_max_length, training=False)
+    # textmodel.loadMyModel(model_in_dir, 10569) #10k epochs!!!
+    # return textmodel
+    return None
 
 #@st.cache(allow_output_mutation=True)
-def make_snk_model():
-    model_in_dir = os.path.join(os.getcwd(), "models/autoencoder")
-    snkmodel = cv.CVAE(cf_latent_dim, cf_img_size, cf_learning_rate, training=False)
-    snkmodel.loadMyModel(model_in_dir, 195)  #only 195 epochs!!!
-    return shapemodel
-
-
-# @st.cache(allow_output_mutation=True)
-# def make_text_model():
-#     model_in_dir = os.path.join(os.getcwd(), "models/textencoder")
-#     textmodel = ts.TextSpacy(cf_latent_dim, max_length=cf_max_length, training=False)
-#     textmodel.loadMyModel(model_in_dir, 10569) #10k epochs!!!
-#     return textmodel
-
-
-# @st.cache(allow_output_mutation=True)
-# def get_spacy():
-#     nlp = spacy.load("en_core_web_md", parser=False, tagger=False, entity=False)
-#     return nlp.vocab
+def get_spacy():
+    nlp = spacy.load("en_core_web_md", parser=False, tagger=False, entity=False)
+    nlp = []
+    return nlp #nlp.vocab
 
 
 def interp(vec1, vec2, divs=5, include_ends=True):
     """[This seems to work for any vectors on our manifold...]
-
-    Args:
-        vec1 ([type]): [description]
-        vec2 ([type]): [description]
-        divs (int, optional): [description]. Defaults to 5.
-        include_ends (bool, optional): [description]. Defaults to True.
-
-    Returns:
-        [type]: [description]
     """
     out = []
     amounts = np.array(range(divs + 1)) / divs if include_ends else np.array(range(1, divs)) / divs
@@ -275,33 +331,13 @@ def interp(vec1, vec2, divs=5, include_ends=True):
 
 
 
-def embeddable_image(label):
-    return image_formatter(label)
-
-
-def get_thumbnail(path):
-    i = Image.open(path)
-    i.thumbnail((64, 64), Image.LANCZOS)
-    return i
-
-def image_base64(im):
-    if isinstance(im, str):
-        im = get_thumbnail(im)
-    with BytesIO() as buffer:
-        im.save(buffer, 'png')
-        return base64.b64encode(buffer.getvalue()).decode()
-
-def image_formatter(im):
-    return f"data:image/png;base64,{image_base64(im)}"
-
-
 
 #%%
 
 
-def showMesh(verts, faces, aspect=dict(x=1, y=1, z=1), plot_it=True, title=""):
+def show_im(img,plot_it=True, title=""):
 
-    fig = plt.imshow()
+    fig = plt.imshow(img)
     # fig = FF. 
     # .create_trisurf(
     #     x=verts[:, 0], y=verts[:, 1], z=verts[:, 2], simplices=faces, title=title, aspectratio=aspect
@@ -319,33 +355,30 @@ def showMesh(verts, faces, aspect=dict(x=1, y=1, z=1), plot_it=True, title=""):
     return fig
 
 
-@st.cache(allow_output_mutation=True)
+#@st.cache(allow_output_mutation=True)
 def load_snkr_model() :
     # model_in_dir = os.path.join(os.getcwd(), 'models/autoencoder')
     # shapemodel = cv.CVAE(128, 64, training=False)
     # shapemodel.loadMyModel(model_in_dir, 195)
     # params['kl_weight'] = kl
     # params['z_dim'] = l
-    data_dir = f"{model_name}-X{params['x_dim'][0]}-Z{params['z_dim']}"
-
+    data_dir = f"data/{model_name}-X{params['x_dim'][0]}-Z{params['z_dim']}"
     print(data_dir)
     epochs = 400
-    vae, hist = load_and_prime_model(model,model_name,params,data_dir,epochs)
-    return vae
+    #vae, hist = load_and_prime_model(model,model_name,params,data_dir,epochs)
 
-# TODO: make sure this is in utilities.  ut.load_and_prime_model
-def load_and_prime_model(model,model_name,params,data_dir,epochs):
-    filename = f"overtrain-{model_name}-kl_weight{params['kl_weight']:03d}.pkl"    
-    hist,params = ut.load_pickle(os.path.join(data_dir,filename))
+    # do i need to do this part?
+    # filename = f"overtrain-{model_name}-kl_weight{params['kl_weight']:03d}.pkl"    
+    # hist,p = ut.load_pickle(os.path.join(data_dir,filename))
 
-    vae = model(dim_z=params['z_dim'], dim_x=params['x_dim'], 
-                learning_rate=0.0001, kl_weight=params['kl_weight'])
-
+    # vae = model(dim_z=p['z_dim'], dim_x=p['x_dim'], 
+    #             learning_rate=0.0001, kl_weight=p['kl_weight'])
+    vae = model(dim_z=params['z_dim'], dim_x=params['x_dim'],learning_rate=0.0001, kl_weight=params['kl_weight'])
     vae.compile(optimizer=vae.optimizer, loss = vae.partial_vae_loss)
     sv_path = os.path.join(data_dir,f"kl_weight{params['kl_weight']:03d}")
     vae.load_model(sv_path, epochs)
 
-    return vae,hist
+    return vae
 
 # # plotVox
 # def plotImg(imgIn, title="", tsnedata=None):
@@ -372,7 +405,7 @@ def vect_to_sneak():
     loading_text = st.empty()
     loading_text.text("Making text encoder model..[not really].")
 
-    shapemodel = make_snk_model()
+    vae = load_snkr_model()
     loading_text.text("Making shape generator model...")
 
     # loading_text.text("Getting Spacy Embeddings...")
@@ -402,14 +435,13 @@ def vect_to_sneak():
     #     except:
     #         continue
 
+#%%
 
 def vect_explore():
     set_widemode_hack()
     header.title("Vector exploration")
 
-    umap_df = get_latent_data()
 
-    init_bokeh_plot(umap_df)
 
     bright = [
         "#023EFF",
@@ -425,24 +457,65 @@ def vect_explore():
         "#222A2A",
     ]
 
-    color_option = st.sidebar.selectbox(
-        "Color Data",
-        [
-            "Category",
-            "Length",
-            "Height",
-            "Width",
-            "Squareness",
-            "Class Length",
-            "Class Height",
-            "Class Width",
-            "Class Square",
-            "Log Loss",
-        ],
+    model_options = model_names
+    X_options = [str(x) for x in pix_dims]
+    Z_options = [str(x) for x in latent_dims]
+    kl_options = [str(x) for x in klws]
+    
+    model_option = st.sidebar.selectbox(
+        "model",
+        model_options,
     )
+
+    klweight_option = st.sidebar.selectbox(
+        "kl weight",
+        kl_options,
+    )
+
+    X_option = st.sidebar.selectbox(
+        "pix dim",
+        X_options,
+    )
+
+    Z_option = st.sidebar.selectbox(
+        "latent dim",
+        Z_options,
+    )
+
+    color_option = st.sidebar.selectbox(
+    "Color Data",
+    [
+        "Category",
+        "Length",
+        "Height",
+        "Width",
+        "Squareness",
+        "Class Length",
+        "Class Height",
+        "Class Width",
+        "Class Square",
+        "Log Loss",
+    ],)
+
     size = st.sidebar.number_input("Plot Dot Size", value=6.0, min_value=0.1, max_value=30.0, step=1.0)
     
     
+    print(f"model:{model_option}, z-{Z_option}, x-{X_option}, kl-{klweight_option}")
+
+
+    model_name = model_option
+    model = model_names[0]
+    
+    params['x_dim'] = (X_option,X_option,3)
+    params['z_dim'] = Z_option
+    params['kl_weight'] = klweight_option
+
+    data_df,snk2vec,latents, labels, vecs,vec_tree,mids = load_latent_data()
+
+    bokeh_fig = init_bokeh_plot(data_df)
+
+    st.write(bokeh_fig)
+
     
     #     padding = 1.05
     #     xmin, xmax = df_tsne.tsne1.min(), df_tsne.tsne1.max()
@@ -471,6 +544,7 @@ def vect_explore():
     #     addThumbnailSelections(df_tsne)
 
 
+#%%
 
 def sneaker_gen():
     set_widemode_hack()
@@ -491,63 +565,12 @@ def sneaker_gen():
     Z_options = [str(x) for x in latent_dims]
     kl_options = [str(x) for x in klws]
 
-    starting_model = st.sidebar.selectbox("Choose starting shape:", cat_options)
-    starting_X = st.sidebar.selectbox("Choose starting shape:", cat_options)
-    starting_Z = st.sidebar.selectbox("Choose starting shape:", cat_options)
-    starting_kl = st.sidebar.selectbox("Choose starting shape:", cat_options)
+    starting_model = st.sidebar.selectbox("Choose starting model:", model_options)
+    starting_X = st.sidebar.selectbox("Choose starting img size:", X_options)
+    starting_Z = st.sidebar.selectbox("Choose starting latent:", Z_options)
+    starting_kl = st.sidebar.selectbox("Choose starting kl weight:", kl_options)
     
-    start_indices = getStartVects()
-    start_index = random.choice(start_indices[starting_cat])
-
-    df_tsne = getTSNE2DData()
-
-    vects_sample = st.sidebar.number_input(
-        "Variety of samples (higher --> diverse)", value=200, min_value=10, max_value=1000, step=5
-    )
-
-    ### WHAT DOES THE JOURNEY DO?
-    # start_vect = shape2vec[mids[start_index]]
-
-    # visited_indices = [start_index]
-    # for i in range(3):
-    #     journey_vecs = []
-    #     journey_mids = []
-    #     journey_mids.append(mids[start_index])
-    #     subheader.subheader("Generating models... please wait...")
-
-    #     for i in range(5):
-    #         n_dists, close_ids = vec_tree.query(start_vect, k=vects_sample, distance_upper_bound=max_dist)
-    #         if len(shape2vec) in close_ids:
-    #             n_dists, close_ids = vec_tree.query(
-    #                 start_vect, k=vects_sample, distance_upper_bound=max_dist * 3
-    #             )
-    #         close_ids = list(close_ids)
-
-    #         visited_indices = visited_indices[:50]
-    #         for index in sorted(close_ids, reverse=True):
-    #             if index in visited_indices:
-    #                 close_ids.remove(index)
-
-    #         next_index = random.choice(close_ids)
-    #         next_vect = vecs[next_index]
-    #         visited_indices.append(next_index)
-    #         interp_vects = interp(next_vect, start_vect, divs=interp_points)
-    #         journey_vecs.extend(interp_vects)
-    #         start_vect = next_vect
-    #         journey_mids.append(mids[next_index])
-
-    #     journey_voxs = np.zeros((len(journey_vecs), cf_vox_size, cf_vox_size, cf_vox_size))
-    #     for i, vect in enumerate(journey_vecs):
-    #         journey_voxs[i, ...] = shapemodel.decode(vect[None, ...], apply_sigmoid=True)[0, ..., 0]
-
-    #     subheader.subheader("Showing models... (may have to scroll down)")
-    #     for i, vox in enumerate(journey_voxs):
-    #         data = plotVox(vox, step=plot_step, tsnedata=df_tsne)
-    #         empty.image(data)
-    # subheader.subheader("All done!")
-
-
-    setWideModeHack()
+    data_df,snk2vec,latents, labels, vecs,vec_tree,mids =load_latent_data()
     
     header.title('Text 2 shape')
     loading_text = st.empty()
@@ -557,10 +580,81 @@ def sneaker_gen():
     loading_text.text('Making text encoder model...[not]')
     #textmodel = makeTextModel()
     loading_text.text('Making shape generator model...[yes!]')
-    shapemodel = makeShapeModel()
+    vae = load_snkr_model()
     loading_text.text('Models done being made![not]')
+
+
+    start_index = random.choice(mids)
+    end_index = random.choice(mids)
+
+    ## WHAT DOES THE JOURNEY DO?
+ 
+    start_vect = snk2vec[start_index]
+    end_vect = snk2vec[end_index]
+
+    visited_indices = [start_index]
+
+    # n_journeys = 1
+    # for _ in range(n_journeys):
+    journey_vecs = []
+    journey_mids = []
+
+
+    journey_mids.append(start_index)
+    #subheader.subheader("Generating models... please wait...")
+    journey_vecs.append(start_vect)
+
+    n_steps = 5
+    interp_vects = interp(end_vect, start_vect,divs=n_steps)
+
+    closest = []
+    for i,vect in enumerate(interp_vects):
+
+        max_dist = 8
+        n_dists, close_ids = vec_tree.query(vect, k=10, distance_upper_bound=max_dist)
+        # if we got infinities do it again...
+        if len(snk2vec) == close_ids[0]:
+            n_dists, close_ids = vec_tree.query(
+                start_vect, k=vects_sample, distance_upper_bound=max_dist * 3
+            )
+        #vector looks most like this:
+        closest.append(close_ids[0])
+        journey_mids.append(mids[close_ids[0]])
+
+    journey_mids
+    journey_vecs = interp_vects
+
+
+
     
+  
+  
+
+    journey_imgs = np.zeros( (len(journey_vecs), params['x_dim'][0], params['x_dim'][1], params['x_dim'][2]) )
+    for i, vect in enumerate(journey_vecs):
+        journey_imgs[i,] = vae.decode(vect[None, ], apply_sigmoid=True)
+
+    #subheader.subheader("Showing models... (may have to scroll down)")
     
+    fig, ax = plt.subplots(1,n_steps,figsize=(16, 4))
+    ax = ax.flatten()
+    
+    for i in range(n_steps):
+        im = journey_imgs[i,:,:,:].squeeze()
+        # ut.plot_img(im, 
+        #         title="", 
+        #         stats=False, 
+        #         limits=None, 
+        #         show_axes=True, save_fig=False, show_fig=True, threshold=None)
+
+        # empty.image(data)
+        ax[i].imshow(im.squeeze())
+        # plt.colorbar()
+
+
+    subheader.subheader("All done!")
+
+  
     # # this is the flow for making image from text...
     # # get description
     # description = st.text_input('Enter Shape Description:', value='a regular chair with four legs.')
@@ -571,14 +665,17 @@ def sneaker_gen():
     # verts, faces = createMesh(vox, step=1)
     # # show the image
     # fig = show_image(verts, faces)
-    # st.write(fig)
+    st.write(fig)
 
 
-
-
+def show_example_img():
+    img = get_image("media/Jordan.jpg")
+    return show_im(img)
+    
 
 
 def manual():
+    
     example_descriptions = loadExampleDescriptions()
     header.title("Streamlit App Manual")
     st.write(
@@ -594,8 +691,8 @@ def manual():
     # just a random number
     example_sneaker = 555
 
-    fig = show_example_vect(example)
-
+    fig = show_example_img()
+        
     st.write(fig)
 
     st.write(
@@ -686,9 +783,13 @@ def manual():
         "Yeezy",
     ]
     # gif_urls = [
-    #     "https://github.com/starstorms9/shape/blob/master/media/{}.gif?raw=true".format(cat.lower())
+    #     "https://github.com/starstorms9/shape/blob/master/media/{}.jpg?raw=true".format(cat.lower())
     #     for cat in cat_options
     # ]
+    gif_urls = [
+         "media/{}.jpg".format(cat)
+         for cat in cat_options
+     ]
     selected_cat = st.selectbox("Select a category to see shape interpolations", cat_options, index=0)
     gif_url = gif_urls[cat_options.index(selected_cat)]
     
@@ -714,14 +815,12 @@ if server_up:
 
 
 
-
-
-
-
+#%%
 
 ###############################################
 ###
 ####################################################
+
 
 
 def condition_text_input(text):
@@ -799,35 +898,5 @@ def addMIDLines(df_tsne, fig):
     return
 
 
-def getStartVects():
-    sindices = {
-        "Table": [7764, 6216, 3076, 2930, 715, 3165],
-        "Chair": [
-            9479,
-            13872,
-            12775,
-            9203,
-            9682,
-            9062,
-            8801,
-            8134,
-            12722,
-            7906,
-            10496,
-            11358,
-            13475,
-            9348,
-            13785,
-            11697,
-        ],
-        "Lamp": [15111, 15007, 14634, 14646, 15314, 14485],
-        "Faucet": [15540, 15684, 15535, 15738, 15412],
-        "Clock": [16124, 16034, 16153],
-        "Bottle": [16690, 16736, 16689],
-        "Vase": [17463, 17484, 17324, 17224, 17453],
-        "Laptop": [17780, 17707, 17722],
-        "Bed": [18217, 18161],
-        "Mug": [18309, 18368, 18448],
-        "Bowl": [18501, 17287, 18545, 18479, 18498],
-    }
-    return sindices
+
+# %%
