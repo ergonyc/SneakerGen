@@ -244,6 +244,7 @@ def decoder_x(dim_z=64,dim_x=(192,192,3)):
 
 
 
+
 class K_PCVAE(tf.keras.Model):
     def __init__(self, dim_z, dim_x, learning_rate, kl_weight=1, name="autoencoder", **kwargs):
         super(K_PCVAE, self).__init__(name=name, **kwargs)
@@ -285,15 +286,20 @@ class K_PCVAE(tf.keras.Model):
         x_hat = tf.math.sigmoid(x_logits)
         return x_hat
 
+
     # vae loss function -- only the negative log-likelihood part,
     # since we use add_loss for the KL divergence part
-    def partial_vae_loss(self, x_true):
+    def partial_vae_loss(self, x_true,x_pred=None):
         # x_recons_logits = model.encode_and_decode(x_true)
-        z = self.encoder(x_true)
-        x_logits = self.decoder(z)
-        # compute cross entropy loss for each dimension of every datapoint
-        # change this to MSE
-        mse = tf.math.squared_difference(tf.keras.activations.sigmoid(x_logits), x_true)
+        if x_pred is None:
+            x_pred = self(x_true) # pass through the encoder/decoder
+        mse = tf.math.squared_difference(tf.cast(x_pred,tf.float32), 
+                                        tf.cast(x_true,tf.float32))
+        # z = self.encoder(x_true)
+        # x_logits = self.decoder(z)
+        # # compute cross entropy loss for each dimension of every datapoint
+        # # change this to MSE
+        # mse = tf.math.squared_difference(tf.keras.activations.sigmoid(x_logits), x_true)
         neg_log_likelihood = tf.math.reduce_sum(mse, axis=[1, 2, 3])
         return tf.math.reduce_mean(neg_log_likelihood)
 
@@ -487,6 +493,257 @@ class K_PCVAE_KL_Reg(tf.keras.Model):
         self.decoder.load_weights(os.path.join(dir_path, "dec_epoch_{}.h5".format(epoch)))
 
 
+
+##################FUENTES MODEL############
+
+#%% CVAE Class that extends the standard keras model
+#  From the arcitecture shared from Emmanuel Fuentes. examples from GOAT
+# Architecture Hyperparameters:
+#     Latent Size (research default 256, production default 32)
+#     Filter Factor Size (research default 16, production default 32)
+#     Latent Linear Hidden Layer Size (research default 2048, production default 1024)
+# The encoder architecture is as follows with research defaults from above:
+#     Input 3x128x128 (conv2d block [conv2d, batchnorm2d, relu])
+#     16x64x64 (conv2d block [conv2d, batchnorm2d, relu])
+#     32x32x32 (conv2d block [conv2d, batchnorm2d, relu])
+#     64x16x16 (conv2d block [conv2d, batchnorm2d, relu])
+#     128x8x8 (conv2d block [conv2d, batchnorm2d, relu])
+#     Flatten to 8192
+#     2048 (linear block [linear, batchnorm1d, relu])
+#     Split the 2048 dimension into mu and log variance for the parameters of the latent distribution
+#     Latent mu size 256 (linear layer only with bias)
+#     Latent logvar size 256 (linear layer only with bias)
+
+
+
+def encoder_z_bn(dim_z=64, dim_x=(192,192,3), kl_weight=1.0):
+    # self.encoder_input = Input(shape=(self.hps['max_seq_len'], 5), name='encoder_input')
+    # decoder_input = Input(shape=(self.hps['max_seq_len'], 5), name='decoder_input')
+
+    prior = tfp.distributions.Independent(tfp.distributions.Normal(loc=tf.zeros(dim_z), scale=1),
+                    reinterpreted_batch_ndims=1)
+
+    encoder_z = tf.keras.Sequential([
+        Conv2D(filters=16, input_shape=dim_x),
+        tfkl.BatchNormalization(),
+        Conv2D(filters=32),
+        tfkl,BatchNormalization(),
+        Conv2D(filters=64),
+        tfkl,BatchNormalization(),
+        Conv2D(filters=128),
+        tfkl,BatchNormalization(),
+        Conv2D(filters=256),
+        tfkl,BatchNormalization(),
+        tfkl.Flatten(),
+        # might want to use IndependentNormal vs multivariate?  easier to disentangle?
+        # tfkl.Dense(tfp.layers.MultivariateNormalTriL.params_size(dim_z),
+        #                 activation=None, 
+        #                 name='z_params'),
+        # tfpl.MultivariateNormalTriL(dim_z,
+        #                 convert_to_tensor_fn=tfp.distributions.Distribution.sample,
+        #                 activity_regularizer=None, 
+        #                 name='z_layer'),
+        # tfpl.KLDivergenceAddLoss(
+        #     tfp.distributions.MultivariateNormalDiag(loc=tf.zeros(dim_z)),
+        #     weight = kl_weight ,name="kl_loss"), #scale defaults to identity
+        tfkl.Dense(tfpl.IndependentNormal.params_size(dim_z), 
+                                 activation=None, name='z_params',),
+        tfpl.IndependentNormal(dim_z, 
+            convert_to_tensor_fn=tfp.distributions.Distribution.sample, 
+            activity_regularizer=None,#tfpl.KLDivergenceRegularizer(prior, weight=kl_weight), 
+            name='z_layer'),
+        tfpl.KLDivergenceAddLoss(
+            prior, #tfp.distributions.Normal(loc=tf.zeros(dim_z), scale=1),
+            #test_points_fn=tf.convert_to_tensor,
+            weight = kl_weight ,
+            name="kl_loss"), #scale defaults to identity
+        ],        
+
+
+        name="encoder",)
+
+    return encoder_z
+
+
+def decoder_x_bn(dim_z=64,dim_x=(192,192,3)):
+    """
+    """
+    n_layers = 5
+    pix_dim = dim_x[0]
+    init_dim = pix_dim//(2** (n_layers-1))
+
+    decoder_x = tf.keras.Sequential([
+        tfkl.InputLayer(input_shape=dim_z),
+        tfkl.Reshape((1, 1, dim_z)),
+        tfkl.Conv2DTranspose(
+            filters=256,
+            kernel_size=init_dim,
+            strides=1,  # (strides,strides)?
+            padding="valid",
+            activation="relu",
+            kernel_regularizer=tf.keras.regularizers.l2(REGULARIZE_FACT),
+            ),
+        Conv2DTranspose(filters=128),
+        tfkl,BatchNormalization(),
+        Conv2DTranspose(filters=64),
+        tfkl,BatchNormalization(),
+        Conv2DTranspose(filters=32),
+        tfkl,BatchNormalization(),
+        Conv2DTranspose(filters=16),
+        tfkl.Conv2DTranspose(
+            filters=3, kernel_size=KERNEL_SZ, strides=1, 
+            padding="SAME", activation=None
+            ),
+
+        # note that here we don't need 
+        # `tfkl.Dense(tfpl.IndependentBernoulli.params_size(self.dim_x))` because 
+        # we've restored the desired input shape with the last Conv2DTranspose layer
+        # tfpl.IndependentBernoulli(self.dim_x, name='x_layer'),
+        # OR:
+        # layers.append(tfpl.IndependentNormal(self.dim_x, name='x_layer', 
+        #     convert_to_tensor_fn=tfd.Distribution.sample, 
+        #     activity_regularizer=tfpl.KLDivergenceRegularizer(prior, weight=self.kl_weight),
+        # ), 
+        ],
+        name="decoder",)
+
+    return decoder_x
+
+# _BN for BATCH NORM
+class K_PCVAE_BN(tf.keras.Model):
+    def __init__(self, dim_z, dim_x, learning_rate, kl_weight=1, name="autoencoder", **kwargs):
+        super(K_PCVAE_BN, self).__init__(name=name, **kwargs)
+        self.dim_x = dim_x
+        self.dim_z = dim_z
+        self.kl_weight = kl_weight  # beta
+
+        self.learning_rate = learning_rate
+        self.optimizer = tf.keras.optimizers.Adam(self.learning_rate)
+
+        self.encoder = encoder_z(dim_z = dim_z, dim_x=dim_x ,kl_weight=1.0) #do weighting in trainstep
+
+        self.decoder = decoder_x(dim_z = dim_z, dim_x=dim_x )
+
+        self.elbo_tracker = tf.keras.metrics.Mean(name="elbo")
+        self.kl_mc= tf.keras.metrics.Mean(name="kl")
+        self.nll_tracker = tf.keras.metrics.Mean(name="nll")
+        self.kl_analytic = tf.keras.metrics.Mean(name="kla")
+
+    def build_vae_keras_model(self):
+        x_input = tfk.Input(shape=self.dim_x)
+        encoder = encoder_z()
+        decoder = decoder_x()
+        z = encoder(x_input)
+
+        model = tfk.Model(inputs=x_input, outputs=decoder(z))
+        # # compile VAE model
+        # model.compile(loss=negative_log_likelihood, 
+        #               optimizer=tfk.optimizers.Adam(self.learning_rate))
+        return model
+
+    # def encode_and_decode(self, x_input):
+    def call(self, x_input):
+        if isinstance(x_input, tuple):  # should always be
+            x_input = x_input[0]
+        z = self.encoder(x_input)
+        x_logits = self.decoder(z)
+        # this is the raw output... no "activation" has been applied...
+        x_hat = tf.math.sigmoid(x_logits)
+        return x_hat
+
+
+    # vae loss function -- only the negative log-likelihood part,
+    # since we use add_loss for the KL divergence part
+    def partial_vae_loss(self, x_true,x_pred=None):
+        # x_recons_logits = model.encode_and_decode(x_true)
+        if x_pred is None:
+            x_pred = self(x_true)
+        mse = tf.math.squared_difference(tf.cast(x_pred,tf.float32), 
+                                        tf.cast(x_true,tf.float32))
+        # mse = tf.math.squared_difference(x_pred, x_true)
+        # z = self.encoder(x_true)
+        # x_logits = self.decoder(z)
+        # # compute cross entropy loss for each dimension of every datapoint
+        # # change this to MSE
+        # mse = tf.math.squared_difference(tf.keras.activations.sigmoid(x_logits), x_true)
+        neg_log_likelihood = tf.math.reduce_sum(mse, axis=[1, 2, 3])
+        return tf.math.reduce_mean(neg_log_likelihood)
+
+
+    @tf.function
+    def train_step(self, x):
+        if isinstance(x, tuple):  # should always be
+            x = x[0]
+        with tf.GradientTape() as tape:
+            #loss = self.compute_loss(x)
+            #cost_mini_batch = self.vae_cost(x)
+            neg_log_lik = self.partial_vae_loss(x)
+                   
+            kl_loss_l = self.encoder.get_layer('kl_loss') #self.encoder.kl_lossTFP.losses 
+            kl_loss= kl_loss_l.losses[-1]
+        
+            # kl_loss_l = self.encoder.layers[-1] #self.encoder.kl_lossTFP.losses 
+            # kl_loss = kl_loss_l.losses[-1]
+            # make sure its the last entry in the list... 
+            total_vae_loss = neg_log_lik + self.kl_weight*kl_loss
+
+
+        gradients = tape.gradient(total_vae_loss, self.trainable_variables)
+        #gradients = tape.gradient(loss, self.trainable_variables)
+        self.optimizer.apply_gradients(zip(gradients, self.trainable_variables))
+        # return cost_mini_batch # loss
+        # Compute our own metrics    
+        
+        self.elbo_tracker.update_state(total_vae_loss) 
+        self.kl_mc.update_state(kl_loss)
+        self.nll_tracker.update_state(neg_log_lik)
+        self.kl_analytic.update_state(kl_loss*self.kl_weight)
+
+        return {m.name: m.result() for m in self.metrics}
+
+
+    #@tf.function
+    def test_step(self, x):        
+        if isinstance(x, tuple):  # should always be
+            x = x[0]
+        neg_log_lik = self.partial_vae_loss(x)
+
+        kl_loss_l = self.encoder.get_layer('kl_loss') #self.encoder.kl_lossTFP.losses 
+        kl_loss= kl_loss_l.losses[-1]
+        # kl_loss_l = self.encoder.layers[-1] #self.encoder.kl_lossTFP.losses 
+        # kl_loss = kl_loss_l.losses[-1]
+        total_vae_loss = neg_log_lik + kl_loss
+
+        self.elbo_tracker.update_state(total_vae_loss) 
+        self.kl_mc.update_state(kl_loss)
+        self.nll_tracker.update_state(neg_log_lik)
+        self.kl_analytic.update_state(kl_loss*self.kl_weight)
+
+        return {m.name: m.result() for m in self.metrics}
+    
+
+    @property
+    def metrics(self):
+        # We list our `Metric` objects here so that `reset_states()` can be
+        # called automatically at the start of each epoch
+        # or at the start of `evaluate()`.x
+        # If you don't implement this property, you have to call
+        # `reset_states()` yourself at the time of your choosing.
+        return [self.elbo_tracker, self.kl_mc, self.kl_analytic, self.nll_tracker]
+
+
+    def reset_metrics(self):
+        # `reset_states()` yourself at the time of your choosing.
+        for m in self.metrics:
+            m.reset_states()
+
+    def save_model(self, dir_path, epoch):
+        self.encoder.save_weights(os.path.join(dir_path, "enc_epoch_{}.h5".format(epoch)))
+        self.decoder.save_weights(os.path.join(dir_path, "dec_epoch_{}.h5".format(epoch)))
+
+    def load_model(self, dir_path, epoch):
+        self.encoder.load_weights(os.path.join(dir_path, "enc_epoch_{}.h5".format(epoch)))
+        self.decoder.load_weights(os.path.join(dir_path, "dec_epoch_{}.h5".format(epoch)))
 
 
 #####################################
@@ -1175,3 +1432,21 @@ def train_step(x_true, model, optimizer, loss_metric, kl_loss_metric):
 
 
 # %%
+
+#%% CVAE Class that extends the standard keras model
+#  From the arcitecture shared from Emmanuel Fuentes. examples from GOAT
+# Architecture Hyperparameters:
+#     Latent Size (research default 256, production default 32)
+#     Filter Factor Size (research default 16, production default 32)
+#     Latent Linear Hidden Layer Size (research default 2048, production default 1024)
+# The encoder architecture is as follows with research defaults from above:
+#     Input 3x128x128 (conv2d block [conv2d, batchnorm2d, relu])
+#     16x64x64 (conv2d block [conv2d, batchnorm2d, relu])
+#     32x32x32 (conv2d block [conv2d, batchnorm2d, relu])
+#     64x16x16 (conv2d block [conv2d, batchnorm2d, relu])
+#     128x8x8 (conv2d block [conv2d, batchnorm2d, relu])
+#     Flatten to 8192
+#     2048 (linear block [linear, batchnorm1d, relu])
+#     Split the 2048 dimension into mu and log variance for the parameters of the latent distribution
+#     Latent mu size 256 (linear layer only with bias)
+#     Latent logvar size 256 (linear layer only with bias)

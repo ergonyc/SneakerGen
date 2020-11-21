@@ -51,6 +51,9 @@ cf_num_epochs = cf.N_IMGRUN_EPOCH
 cf_val_frac = cf.VALIDATION_FRAC
 #%%  are we GPU-ed?
 tf.config.experimental.list_physical_devices('GPU') 
+#
+#physical_devices = tf.config.list_physical_devices('GPU')
+#print("Num GPUs:", len(physical_devices))
 #%% helpers
 latent_dim = 40
 pix_dim = 160
@@ -75,7 +78,7 @@ def make_dir(dirname):
 #####################################################
 
 data_from_scratch = not ut.check_for_datafiles(cf.DATA_DIR,['train_data.npy','val_data.npy','all_data.npy'])
-data_from_scratch = True
+#data_from_scratch = True
 random.seed(488)
 tf.random.set_seed(488)
 
@@ -117,10 +120,12 @@ x = test_samples
 
 
 #%%
-model = kcv.K_PCVAE_KL_Reg
-model_name = "K_PCVAE_KL_Reg"
+model = kcv.K_PCVAE_BN
+model_name = "K_PCVAE_BN"
+# model = kcv.K_PCVAE
+# model_name = "K_PCVAE"
 data_dir = f"data/{model_name}-X{params['x_dim'][0]}-Z{params['z_dim']}"
-epochs = 500
+epochs = 400
 
 def overtrain_vae(model, model_name, data_dir,params, epochs):
     make_dir(data_dir)
@@ -148,13 +153,42 @@ def overtrain_vae(model, model_name, data_dir,params, epochs):
 
 
 #%%
-#overtrain_vae(model, model_name, data_dir,params,epochs)
+overtrain_vae(model, model_name, data_dir,params,epochs)
 
+
+#%%%
 
 model = kcv.K_PCVAE
 model_name = "K_PCVAE"
 data_dir = f"data/{model_name}-X{params['x_dim'][0]}-Z{params['z_dim']}"
 #overtrain_vae(model, model_name, data_dir,params,epochs)
+# %%
+
+latent_dim = 40
+pix_dim = 160
+batch_size = 64
+epochs = 100
+kl_weight = 5
+
+klws = [1,2,3,5,10]
+latents = [32,40,64]
+epochs = 400
+
+
+for kl in klws:
+    params['kl_weight'] = kl
+    for l in latents:
+        params['z_dim'] = l
+        print(f"training beta={kl} z={l}")
+        data_dir = f"data/{model_name}-X{params['x_dim'][0]}-Z{params['z_dim']}"
+        print(data_dir)
+        overtrain_vae(model, model_name, data_dir,params,epochs)
+        print("trained")
+
+
+
+#
+
 
 # %%
 
