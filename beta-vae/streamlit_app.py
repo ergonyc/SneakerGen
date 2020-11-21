@@ -496,7 +496,7 @@ def vect_explore():
         "Class Square",
         "Log Loss",
     ],)
-
+ 
     size = st.sidebar.number_input("Plot Dot Size", value=6.0, min_value=0.1, max_value=30.0, step=1.0)
     
     
