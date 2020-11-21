@@ -606,7 +606,7 @@ def decoder_x_bn(dim_z=64,dim_x=(192,192,3)):
         # ), 
         ],
         name="decoder",)
-
+ 
     return decoder_x
 
 # _BN for BATCH NORM

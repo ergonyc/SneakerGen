@@ -456,7 +456,7 @@ def vect_explore():
         "#00D7FF",
         "#222A2A",
     ]
-
+ 
     model_options = model_names
     X_options = [str(x) for x in pix_dims]
     Z_options = [str(x) for x in latent_dims]
