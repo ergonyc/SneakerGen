@@ -157,6 +157,7 @@ def load_snk2umap(data_dir,kl_weight):
 
 def dump_snk2umap(snk2umap,data_dir,kl_weight):
     load_dir = os.path.join(data_dir,f"kl_weight{kl_weight:03d}")
+    print(load_dir)
     dump_pickle(os.path.join(load_dir,"snk2umap.pkl"), snk2umap)
 
 def get_umap_embedding(snk2vec):
@@ -409,13 +410,13 @@ for model,model_name in zip(models,model_names):
         for l in latents:
             params['z_dim'] = l
             data_dir = f"data/{model_name}-X{params['x_dim'][0]}-Z{params['z_dim']}"
-            print(data_dir)
+            #print(data_dir)
             # vae, hist = load_and_prime_model(model,model_name,params,data_dir,epochs)
             # snk2loss,snk2vec = create_snk2dicts(ds,n_samples,vae)
             # dump_snk2pickles(snk2loss,snk2vec,data_dir,params['kl_weight'])
             snk2loss,snk2vec = load_snk2pickles(data_dir,params['kl_weight'])
             snk2umap = get_umap_embedding(snk2vec)
-            dump_snk2umap(snk2umap,data_dir,kl_weight)   
+            dump_snk2umap(snk2umap,data_dir,kl)   
 #
 
 #############################
@@ -448,7 +449,7 @@ for pix_dim in pix_dims:
             # dump_snk2pickles(snk2loss,snk2vec,data_dir,params['kl_weight'])
             snk2loss,snk2vec = load_snk2pickles(data_dir,params['kl_weight'])
             snk2umap = get_umap_embedding(snk2vec)
-            dump_snk2umap(snk2umap,data_dir,kl_weight) 
+            dump_snk2umap(snk2umap,data_dir,kl) 
 
 #%%
 
